@@ -2583,3 +2583,17 @@ def export(area_id: str = Query("pune_kharadi")):
     out = DATA_DIR / f"bhumi_fuse_{area_id}_export.geojson"
     out.write_text(json.dumps(area, indent=2), encoding="utf-8")
     return FileResponse(out, filename=out.name, media_type="application/geo+json")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    raw_port = os.environ.get("PORT", "8000")
+    if not str(raw_port).isdigit():
+        port = 8000
+    else:
+        try:
+            port = int(raw_port)
+        except (ValueError, TypeError):
+            port = 8000
+    host = os.environ.get("HOST", "0.0.0.0")
+    uvicorn.run("app.main:app", host=host, port=port)
