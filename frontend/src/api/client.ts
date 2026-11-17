@@ -130,6 +130,23 @@ class ApiClient {
       throw new Error("Evidence graph unavailable: Backend server is offline.");
     }
 
+    // Prefer POST /graph when custom uploaded layers are present so graph is built from real uploads
+    if (customLayers && Object.keys(customLayers).length > 0) {
+      const res = await fetch(`${API_BASE}/graph`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          area_id: areaId,
+          investigation_id: investigationId ?? null,
+          custom_layers: customLayers ?? null,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`Evidence graph failed with status ${res.status}`);
+      }
+      return await res.json();
+    }
+
     const query = investigationId ? `investigation_id=${investigationId}` : `area_id=${areaId}`;
     const res = await fetch(`${API_BASE}/graph?${query}`);
     if (!res.ok) {
@@ -460,6 +477,60 @@ class ApiClient {
     if (!res.ok) {
       throw new Error(`Failed to fetch reports (HTTP ${res.status})`);
     }
+    return await res.json();
+  }
+
+  // ── DSA Course Extension API Endpoints ─────────────────────────────────────
+  async getDSASummary(): Promise<any> {
+    const isOnline = await this.checkBackend();
+    if (!isOnline) throw new Error("DSA summary unavailable: Backend server is offline.");
+    const res = await fetch(`${API_BASE}/dsa/summary`);
+    if (!res.ok) throw new Error(`DSA summary failed (HTTP ${res.status})`);
+    return await res.json();
+  }
+
+  async runAStarRoute(payload: {
+    graph: Record<string, [string, number][]>;
+    coords: Record<string, [number, number]>;
+    start: string;
+    goal: string;
+  }): Promise<any> {
+    const isOnline = await this.checkBackend();
+    if (!isOnline) throw new Error("A* routing unavailable: Backend server is offline.");
+    const res = await fetch(`${API_BASE}/dsa/astar-route`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`A* route failed (HTTP ${res.status})`);
+    return await res.json();
+  }
+
+  async queryQuadTree(payload: {
+    points: { x: number; y: number; [key: string]: any }[];
+    viewport?: [number, number, number, number];
+    capacity?: number;
+  }): Promise<any> {
+    const isOnline = await this.checkBackend();
+    if (!isOnline) throw new Error("Quadtree query unavailable: Backend server is offline.");
+    const res = await fetch(`${API_BASE}/dsa/quadtree-query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Quadtree query failed (HTTP ${res.status})`);
+    return await res.json();
+  }
+
+  async runAdvancedTopologyCheck(harmonizedFC: GeoJSON.FeatureCollection): Promise<any> {
+    const isOnline = await this.checkBackend();
+    if (!isOnline) throw new Error("Advanced topology check unavailable: Backend server is offline.");
+    const res = await fetch(`${API_BASE}/validate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ harmonized: harmonizedFC }),
+    });
+    if (!res.ok) throw new Error(`Advanced topology check failed (HTTP ${res.status})`);
     return await res.json();
   }
 }

@@ -28,6 +28,11 @@ from app.db import (
 )
 from app.revenue_data import get_revenue_records, get_revenue_record  # kept for /export/department legacy endpoint only
 from app.attribute_mapping import map_to_department, detect_schema, DEPARTMENT_SCHEMAS
+from app.dsa.kd_tree import KDTree
+from app.dsa.sweep_line import sweep_intersections
+from app.dsa.disjoint_set import conflict_zones
+from app.dsa.astar import astar_search
+from app.dsa.quadtree import QuadTree, Rect
 
 init_db()
 
@@ -119,13 +124,44 @@ class SaveReportRequest(BaseModel):
 
 
 # ── Geometry Helpers ────────────────────────────────────────────────────────
+def extract_coord_ring(geom_or_coords: Any) -> list[list[float]]:
+    """Extract a flat list of [x, y] coordinates from any GeoJSON geometry or coordinates array."""
+    if not geom_or_coords:
+        return []
+    coords = geom_or_coords.get("coordinates") if isinstance(geom_or_coords, dict) else geom_or_coords
+    gtype = geom_or_coords.get("type", "") if isinstance(geom_or_coords, dict) else ""
+    if not coords or not isinstance(coords, list):
+        return []
+    if gtype == "Polygon" or (isinstance(coords[0], list) and coords[0] and isinstance(coords[0][0], list) and isinstance(coords[0][0][0], (int, float))):
+        return coords[0]
+    if gtype == "MultiPolygon":
+        try:
+            return coords[0][0]
+        except Exception:
+            pass
+    if isinstance(coords[0], (int, float)):
+        return [coords]
+    if isinstance(coords[0], list):
+        if coords[0] and isinstance(coords[0][0], (int, float)):
+            return coords
+        if coords[0] and isinstance(coords[0][0], list):
+            return coords[0]
+    return coords
+
+
 def poly_centroid(ring: list) -> tuple[float, float]:
-    pts = ring[:-1] if (len(ring) > 1 and ring[0] == ring[-1]) else ring
-    if not pts:
+    if not ring:
         return 0.0, 0.0
-    cx = sum(p[0] for p in pts) / len(pts)
-    cy = sum(p[1] for p in pts) / len(pts)
+    if isinstance(ring[0], (int, float)):
+        return float(ring[0]), float(ring[1]) if len(ring) > 1 else 0.0
+    pts = ring[:-1] if (len(ring) > 1 and ring[0] == ring[-1]) else ring
+    valid_pts = [p for p in pts if isinstance(p, (list, tuple)) and len(p) >= 2]
+    if not valid_pts:
+        return 0.0, 0.0
+    cx = sum(p[0] for p in valid_pts) / len(valid_pts)
+    cy = sum(p[1] for p in valid_pts) / len(valid_pts)
     return cx, cy
+
 
 
 def geo_distance_m(p1: tuple[float, float], p2: tuple[float, float]) -> float:
@@ -282,7 +318,7 @@ def build_correspondence_set(
     radius_deg_lat = search_radius_m / lat_scale
 
     for i, cad in enumerate(cad_features):
-        cad_ring = cad["geometry"]["coordinates"][0]
+        cad_ring = extract_coord_ring(cad["geometry"])
         cad_cen = poly_centroid(cad_ring)
         cad_area = poly_area_m2(cad_ring, lon_scale, lat_scale)
 
@@ -298,7 +334,7 @@ def build_correspondence_set(
         candidates = []
         for j in candidate_indices:
             drone = drone_features[j]
-            drone_ring = drone["geometry"]["coordinates"][0]
+            drone_ring = extract_coord_ring(drone["geometry"])
             drone_cen = poly_centroid(drone_ring)
             dist_m = geo_distance_m(cad_cen, drone_cen)
 
@@ -1175,6 +1211,23 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
                     "land_use": row.get("land_use_class") or row.get("land_use") or None,
                 }
 
+    # Priority 3: Fallback to STUDY_AREAS if area_id provided for backward compatibility
+    if not cad_features and req.area_id and req.area_id in STUDY_AREAS:
+        area_obj = STUDY_AREAS[req.area_id]
+        cad_features = area_obj.get("cadastral", {}).get("features", [])
+        if not drone_features:
+            drone_features = area_obj.get("extracted", {}).get("features", [])
+        if not gnss_points and "control" in area_obj and "features" in area_obj["control"]:
+            for pt in area_obj["control"]["features"]:
+                coords = pt["geometry"]["coordinates"]
+                gnss_points.append({
+                    "lon": coords[0],
+                    "lat": coords[1],
+                    "h_acc_m": 0.05,
+                    "fix_type": "RTK_FIXED",
+                    "obs_time": None
+                })
+
     # ── Validate minimum required sources ────────────────────────────────────
     if not cad_features:
         return JSONResponse(status_code=422, content={
@@ -1210,6 +1263,13 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
 
     def m_to_deg(mx: float, my: float) -> tuple[float, float]:
         return mx / LON_SCALE, my / LAT_SCALE
+
+    # DSA CP extension: build a balanced KD-Tree once, instead of scanning all
+    # GNSS observations separately for every parcel.
+    gnss_kdtree = KDTree([
+        (deg_to_m(gp["lon"], gp["lat"]), gp)
+        for gp in gnss_points
+    ]) if gnss_points else None
 
     num_parcels = len(cad_features)
 
@@ -1294,7 +1354,7 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
     for corr_idx, corr in enumerate(correspondences):
         i = corr["cad_idx"]
         cad = cad_features[i]
-        cad_ring = cad["geometry"]["coordinates"][0]
+        cad_ring = extract_coord_ring(cad["geometry"])
 
         pid = cad["properties"].get("parcel_id", str(101 + i))
         pnum = cad["properties"].get("parcel_number", 101 + i)
@@ -1437,7 +1497,19 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
 
         gnss_nearest = None
         gnss_dist_m = None
-        if gnss_points:
+        if gnss_kdtree is not None:
+            kd_result = gnss_kdtree.nearest(deg_to_m(c_cad_orig[0], c_cad_orig[1]))
+            if kd_result:
+                gp = kd_result["payload"]
+                gnss_dist_m = round(kd_result["distance"], 2)
+                gnss_nearest = {
+                    **gp,
+                    "distance_to_parcel_m": gnss_dist_m,
+                    "search_method": "KD-Tree nearest neighbour",
+                    "kd_nodes_visited": kd_result["nodes_visited"],
+                    "kd_tree_size": kd_result["tree_size"],
+                }
+        elif gnss_points:
             best_gd = float("inf")
             for gp in gnss_points:
                 d = geo_distance_m((c_cad_orig[0], c_cad_orig[1]), (gp["lon"], gp["lat"]))
@@ -1700,13 +1772,109 @@ def validate(req: TopologyRequest) -> dict[str, Any]:
             "correction_type": correction_type,
         })
 
+    # DSA CP extension: Sweep Line + AVL Tree detect cross-parcel boundary
+    # intersections without brute-force all-edge pair comparison.
+    sweep = sweep_intersections(features)
+    overlap_map: dict[str, list[str]] = {}
+    for pair in sweep["intersections"]:
+        a, b = pair["parcel_a"], pair["parcel_b"]
+        overlap_map.setdefault(a, []).append(b)
+        overlap_map.setdefault(b, []).append(a)
+
+    for r in results:
+        pid = r["parcel_id"].replace("parcel-", "")
+        overlaps = sorted(set(overlap_map.get(pid, [])))
+        if overlaps:
+            r["overlaps_detected"] = overlaps
+            r["overlap_risk"] = min(1.0, 0.45 + 0.1 * len(overlaps))
+            if r["status"] == "pass":
+                r["status"] = "warning"
+                r["validity"] = "Valid polygon, but boundary intersection(s) detected by Sweep Line"
+
+    # DSU groups every connected component of intersecting parcels.
+    dsu_seed = [
+        {"parcel_id": f"parcel-{r['parcel_id'].replace('parcel-','')}", "risk": "high", "residual_m": None}
+        for r in results if r.get("overlaps_detected")
+    ]
+    adjacency_pairs = [(p["parcel_a"], p["parcel_b"]) for p in sweep["intersections"]]
+    zones = conflict_zones(dsu_seed, adjacency_pairs, min_risk=("high",))
+
     return {
         "results": results,
         "n_auto_corrected": n_auto_corrected,
         "n_manual_required": n_manual_required,
         "n_valid": len([r for r in results if r["status"] == "pass"]),
         "total": len(results),
+        "sweep_line": sweep,
+        "conflict_zones": zones,
+        "dsa_used": ["Sweep Line", "AVL Tree", "Disjoint Set Union"],
     }
+
+
+@app.post("/dsa/astar-route")
+async def dsa_astar_route(request: Request) -> dict[str, Any]:
+    """Run A* on a caller-supplied weighted road graph."""
+    payload = await request.json()
+    graph_data = payload.get("graph", {})
+    coords_raw = payload.get("coords", {})
+    start = str(payload.get("start", ""))
+    goal = str(payload.get("goal", ""))
+    graph: dict[str, list[tuple[str, float]]] = {}
+    for node, neighbours in graph_data.items():
+        graph[str(node)] = [
+            (str(n[0]), float(n[1])) for n in neighbours
+            if isinstance(n, (list, tuple)) and len(n) >= 2
+        ]
+    coords = {str(k): (float(v[0]), float(v[1])) for k, v in coords_raw.items()}
+    result = astar_search(graph, coords, start, goal)
+    result["algorithm"] = "A*"
+    result["heuristic"] = "Euclidean distance"
+    return result
+
+
+@app.post("/dsa/quadtree-query")
+async def dsa_quadtree_query(request: Request) -> dict[str, Any]:
+    """Index points in a Quadtree and return only points inside a viewport."""
+    payload = await request.json()
+    points = payload.get("points", [])
+    viewport = payload.get("viewport")
+    if not points:
+        return {"matches": [], "count": 0, "algorithm": "Quadtree"}
+    xs = [float(p["x"]) for p in points]
+    ys = [float(p["y"]) for p in points]
+    tree = QuadTree(Rect(min(xs), min(ys), max(xs), max(ys)), capacity=int(payload.get("capacity", 8)))
+    for p in points:
+        tree.insert((float(p["x"]), float(p["y"])), p)
+    if viewport and len(viewport) == 4:
+        area = Rect(float(viewport[0]), float(viewport[1]), float(viewport[2]), float(viewport[3]))
+    else:
+        area = tree.bounds
+    matches = tree.query(area)
+    return {
+        "matches": matches,
+        "count": len(matches),
+        "tree_stats": tree.stats(),
+        "algorithm": "Quadtree",
+    }
+
+
+@app.get("/dsa/summary")
+def dsa_summary() -> dict[str, Any]:
+    """Course-project DSA inventory. Existing R-Tree is intentionally listed separately."""
+    return {
+        "new_course_dsa": [
+            {"name": "KD-Tree", "use": "nearest GNSS/control-point lookup", "complexity": "average O(log n)"},
+            {"name": "Sweep Line", "use": "parcel-boundary intersection detection", "complexity": "O((n+k) log n)"},
+            {"name": "AVL Tree", "use": "balanced active-status structure for Sweep Line", "complexity": "O(log n)"},
+            {"name": "Disjoint Set Union", "use": "connected land-conflict zones", "complexity": "amortized O(alpha(n))"},
+            {"name": "A*", "use": "field-verification route search", "complexity": "heuristic-guided shortest path"},
+            {"name": "Quadtree", "use": "map viewport spatial partitioning", "complexity": "sublinear region query"},
+        ],
+        "existing_not_claimed_as_new": [
+            {"name": "SQLite R-Tree", "use": "candidate parcel/footprint retrieval", "module": "backend/app/db.py"}
+        ],
+    }
+
 
 
 @app.get("/graph")
@@ -1775,17 +1943,21 @@ def graph(area_id: str = Query("pune_kharadi")) -> dict[str, Any]:
 
     # 5. Real adjacency edges — parcels within ~60m centroid distance
     cad_nodes = [n for n in nodes if n["source_type"] == "authoritative_cadastral_simulated"]
-    cad_centroids = [
-        poly_centroid(cad_features[i]["geometry"]["coordinates"][0])
-        for i in range(len(cad_features))
-    ]
-    for i in range(len(cad_nodes)):
-        for j in range(i+1, len(cad_nodes)):
-            if i < len(cad_centroids) and j < len(cad_centroids):
-                dist = geo_distance_m(cad_centroids[i], cad_centroids[j])
-                if dist < 60:  # ~60m = adjacent plot
-                    links.append({"source": cad_nodes[i]["id"], "target": cad_nodes[j]["id"],
-                                  "relationship": "adjacent_to", "confidence": 1.0})
+    try:
+        cad_centroids = [poly_centroid(f["geometry"]["coordinates"][0]) for f in cad_features]
+        for i in range(len(cad_nodes)):
+            for j in range(i + 1, len(cad_nodes)):
+                if i < len(cad_centroids) and j < len(cad_centroids):
+                    if geo_distance_m(cad_centroids[i], cad_centroids[j]) < 60:
+                        links.append({
+                            "source": cad_nodes[i]["id"],
+                            "target": cad_nodes[j]["id"],
+                            "relationship": "adjacent_to",
+                            "relation": "adjacent_to",
+                            "confidence": 1.0,
+                        })
+    except Exception:
+        pass
 
     return {"nodes": nodes, "links": links}
 
