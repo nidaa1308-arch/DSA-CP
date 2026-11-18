@@ -279,7 +279,7 @@ export const App: React.FC = () => {
     addAuditEntry(
       makeAuditEntry(
         `Decision: ${decision.toUpperCase()}`,
-        `Parcel ${parcelNum}: ${decision.toUpperCase()} submitted. Note: "${notes || "Verified against evidence card"}" — Version ${resp.version} created. Original legal record untouched.`,
+        `Parcel ${parcelNum}: ${decision.toUpperCase()} submitted. Note: "${notes || "Verified against evidence card"}" — Version ${resp?.version ?? 1} created. Original legal record untouched.`,
         "decision"
       )
     );

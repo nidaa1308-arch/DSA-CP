@@ -1,0 +1,869 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-101",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.7731,
+            18.5604
+          ],
+          [
+            73.77346067,
+            18.5604
+          ],
+          [
+            73.77346067,
+            18.56068793
+          ],
+          [
+            73.7731,
+            18.56068793
+          ],
+          [
+            73.7731,
+            18.5604
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-101",
+        "parcel_id": "101",
+        "confidence": 0.9,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-102",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77350338,
+            18.5604
+          ],
+          [
+            73.77386406,
+            18.5604
+          ],
+          [
+            73.77386406,
+            18.56068793
+          ],
+          [
+            73.77350338,
+            18.56068793
+          ],
+          [
+            73.77350338,
+            18.5604
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-102",
+        "parcel_id": "102",
+        "confidence": 0.87,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-103",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77390677,
+            18.5604
+          ],
+          [
+            73.77426744,
+            18.5604
+          ],
+          [
+            73.77426744,
+            18.56068793
+          ],
+          [
+            73.77390677,
+            18.56068793
+          ],
+          [
+            73.77390677,
+            18.5604
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-103",
+        "parcel_id": "103",
+        "confidence": 0.84,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-104",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77431015,
+            18.5604
+          ],
+          [
+            73.77467083,
+            18.5604
+          ],
+          [
+            73.77467083,
+            18.56068793
+          ],
+          [
+            73.77431015,
+            18.56068793
+          ],
+          [
+            73.77431015,
+            18.5604
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-104",
+        "parcel_id": "104",
+        "confidence": 0.81,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-105",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77471354,
+            18.5604
+          ],
+          [
+            73.77507421,
+            18.5604
+          ],
+          [
+            73.77507421,
+            18.56068793
+          ],
+          [
+            73.77471354,
+            18.56068793
+          ],
+          [
+            73.77471354,
+            18.5604
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-105",
+        "parcel_id": "105",
+        "confidence": 0.93,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-106",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77511692,
+            18.5604
+          ],
+          [
+            73.7754776,
+            18.5604
+          ],
+          [
+            73.7754776,
+            18.56068793
+          ],
+          [
+            73.77511692,
+            18.56068793
+          ],
+          [
+            73.77511692,
+            18.5604
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-106",
+        "parcel_id": "106",
+        "confidence": 0.9,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-107",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.7731,
+            18.56072392
+          ],
+          [
+            73.77346067,
+            18.56072392
+          ],
+          [
+            73.77346067,
+            18.56101185
+          ],
+          [
+            73.7731,
+            18.56101185
+          ],
+          [
+            73.7731,
+            18.56072392
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-107",
+        "parcel_id": "107",
+        "confidence": 0.87,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-108",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77350338,
+            18.56072392
+          ],
+          [
+            73.77386406,
+            18.56072392
+          ],
+          [
+            73.77386406,
+            18.56101185
+          ],
+          [
+            73.77350338,
+            18.56101185
+          ],
+          [
+            73.77350338,
+            18.56072392
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-108",
+        "parcel_id": "108",
+        "confidence": 0.84,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-109",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77390677,
+            18.56072392
+          ],
+          [
+            73.77426744,
+            18.56072392
+          ],
+          [
+            73.77426744,
+            18.56101185
+          ],
+          [
+            73.77390677,
+            18.56101185
+          ],
+          [
+            73.77390677,
+            18.56072392
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-109",
+        "parcel_id": "109",
+        "confidence": 0.81,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-110",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77431015,
+            18.56072392
+          ],
+          [
+            73.77467083,
+            18.56072392
+          ],
+          [
+            73.77467083,
+            18.56101185
+          ],
+          [
+            73.77431015,
+            18.56101185
+          ],
+          [
+            73.77431015,
+            18.56072392
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-110",
+        "parcel_id": "110",
+        "confidence": 0.93,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-111",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77471354,
+            18.56072392
+          ],
+          [
+            73.77507421,
+            18.56072392
+          ],
+          [
+            73.77507421,
+            18.56101185
+          ],
+          [
+            73.77471354,
+            18.56101185
+          ],
+          [
+            73.77471354,
+            18.56072392
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-111",
+        "parcel_id": "111",
+        "confidence": 0.9,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-112",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77511692,
+            18.56072392
+          ],
+          [
+            73.7754776,
+            18.56072392
+          ],
+          [
+            73.7754776,
+            18.56101185
+          ],
+          [
+            73.77511692,
+            18.56101185
+          ],
+          [
+            73.77511692,
+            18.56072392
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-112",
+        "parcel_id": "112",
+        "confidence": 0.87,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-113",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.7731,
+            18.56104784
+          ],
+          [
+            73.77346067,
+            18.56104784
+          ],
+          [
+            73.77346067,
+            18.56133577
+          ],
+          [
+            73.7731,
+            18.56133577
+          ],
+          [
+            73.7731,
+            18.56104784
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-113",
+        "parcel_id": "113",
+        "confidence": 0.84,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-114",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77350338,
+            18.56104784
+          ],
+          [
+            73.77386406,
+            18.56104784
+          ],
+          [
+            73.77386406,
+            18.56133577
+          ],
+          [
+            73.77350338,
+            18.56133577
+          ],
+          [
+            73.77350338,
+            18.56104784
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-114",
+        "parcel_id": "114",
+        "confidence": 0.81,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-115",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77390677,
+            18.56104784
+          ],
+          [
+            73.77426744,
+            18.56104784
+          ],
+          [
+            73.77426744,
+            18.56133577
+          ],
+          [
+            73.77390677,
+            18.56133577
+          ],
+          [
+            73.77390677,
+            18.56104784
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-115",
+        "parcel_id": "115",
+        "confidence": 0.93,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-116",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77431015,
+            18.56104784
+          ],
+          [
+            73.77467083,
+            18.56104784
+          ],
+          [
+            73.77467083,
+            18.56133577
+          ],
+          [
+            73.77431015,
+            18.56133577
+          ],
+          [
+            73.77431015,
+            18.56104784
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-116",
+        "parcel_id": "116",
+        "confidence": 0.9,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-117",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77471354,
+            18.56104784
+          ],
+          [
+            73.77507421,
+            18.56104784
+          ],
+          [
+            73.77507421,
+            18.56133577
+          ],
+          [
+            73.77471354,
+            18.56133577
+          ],
+          [
+            73.77471354,
+            18.56104784
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-117",
+        "parcel_id": "117",
+        "confidence": 0.87,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-118",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77511692,
+            18.56104784
+          ],
+          [
+            73.7754776,
+            18.56104784
+          ],
+          [
+            73.7754776,
+            18.56133577
+          ],
+          [
+            73.77511692,
+            18.56133577
+          ],
+          [
+            73.77511692,
+            18.56104784
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-118",
+        "parcel_id": "118",
+        "confidence": 0.84,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-119",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.7731,
+            18.56137176
+          ],
+          [
+            73.77346067,
+            18.56137176
+          ],
+          [
+            73.77346067,
+            18.56165968
+          ],
+          [
+            73.7731,
+            18.56165968
+          ],
+          [
+            73.7731,
+            18.56137176
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-119",
+        "parcel_id": "119",
+        "confidence": 0.81,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-120",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77350338,
+            18.56137176
+          ],
+          [
+            73.77386406,
+            18.56137176
+          ],
+          [
+            73.77386406,
+            18.56165968
+          ],
+          [
+            73.77350338,
+            18.56165968
+          ],
+          [
+            73.77350338,
+            18.56137176
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-120",
+        "parcel_id": "120",
+        "confidence": 0.93,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-121",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77390677,
+            18.56137176
+          ],
+          [
+            73.77426744,
+            18.56137176
+          ],
+          [
+            73.77426744,
+            18.56165968
+          ],
+          [
+            73.77390677,
+            18.56165968
+          ],
+          [
+            73.77390677,
+            18.56137176
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-121",
+        "parcel_id": "121",
+        "confidence": 0.9,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-122",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77431015,
+            18.56137176
+          ],
+          [
+            73.77467083,
+            18.56137176
+          ],
+          [
+            73.77467083,
+            18.56165968
+          ],
+          [
+            73.77431015,
+            18.56165968
+          ],
+          [
+            73.77431015,
+            18.56137176
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-122",
+        "parcel_id": "122",
+        "confidence": 0.87,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-123",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77471354,
+            18.56137176
+          ],
+          [
+            73.77507421,
+            18.56137176
+          ],
+          [
+            73.77507421,
+            18.56165968
+          ],
+          [
+            73.77471354,
+            18.56165968
+          ],
+          [
+            73.77471354,
+            18.56137176
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-123",
+        "parcel_id": "123",
+        "confidence": 0.84,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "extracted-boundary-124",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.77511692,
+            18.56137176
+          ],
+          [
+            73.7754776,
+            18.56137176
+          ],
+          [
+            73.7754776,
+            18.56165968
+          ],
+          [
+            73.77511692,
+            18.56165968
+          ],
+          [
+            73.77511692,
+            18.56137176
+          ]
+        ]
+      },
+      "properties": {
+        "id": "extracted-boundary-124",
+        "parcel_id": "124",
+        "confidence": 0.81,
+        "method": "SegFormer-B0 Drone Segmentation",
+        "source_type": "derived_imagery_real"
+      }
+    }
+  ]
+}

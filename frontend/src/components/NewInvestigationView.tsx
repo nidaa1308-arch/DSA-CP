@@ -18,6 +18,23 @@ export const NewInvestigationView: React.FC<NewInvestigationViewProps> = ({
   const [surveyYear, setSurveyYear] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingSample, setLoadingSample] = useState(false);
+
+  const handleLoadSampleInvestigation = async () => {
+    setLoadingSample(true);
+    try {
+      const res = await api.loadSampleInvestigation();
+      if (res?.investigation) {
+        onInvestigationCreated(res.investigation);
+        onNavigate("upload");
+      }
+    } catch (err: any) {
+      console.error("Failed to load sample investigation:", err);
+      alert("Failed to load sample investigation: " + (err?.message || err));
+    } finally {
+      setLoadingSample(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,10 +73,22 @@ export const NewInvestigationView: React.FC<NewInvestigationViewProps> = ({
           <h2>New Investigation</h2>
           <p>Create a new land harmonization project</p>
         </div>
-        <button className="btn-outline-sm" onClick={handleUseDemoDefaults}>
-          <Sparkles size={14} style={{ marginRight: "6px" }} />
-          <span>Use SIH Demo Template</span>
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button 
+            type="button" 
+            className="btn-outline-sm" 
+            onClick={handleLoadSampleInvestigation}
+            disabled={loadingSample}
+            style={{ borderColor: "#2563eb", color: "#2563eb", fontWeight: 600 }}
+          >
+            <Sparkles size={14} style={{ marginRight: "6px" }} />
+            <span>{loadingSample ? "Loading Sample Data..." : "Load Sample Investigation"}</span>
+          </button>
+          <button type="button" className="btn-outline-sm" onClick={handleUseDemoDefaults}>
+            <Sparkles size={14} style={{ marginRight: "6px" }} />
+            <span>Use Template Defaults</span>
+          </button>
+        </div>
       </div>
 
       {/* Stepper Header */}

@@ -16,8 +16,9 @@ def get_db() -> sqlite3.Connection:
 
 def _sha256_row(prev_hash: str, row_data: dict) -> str:
     """Compute SHA-256(prev_hash + JSON(row_data)) for tamper-evident chaining."""
-    payload = prev_hash + json.dumps(row_data, sort_keys=True, default=str)
-    return hashlib.sha256(payload.encode()).hexdigest()
+    serialized = json.dumps(row_data, sort_keys=True, separators=(",", ":"), default=str)
+    payload = f"{prev_hash}|{serialized}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _get_latest_hash(cursor: sqlite3.Cursor, table: str) -> str:
@@ -276,7 +277,7 @@ def get_db_stats() -> dict[str, Any]:
 
 
 def verify_audit_chain() -> dict[str, Any]:
-    """Recompute the hash chain and report whether it is intact."""
+    """Recompute the audit logs hash chain and report whether it is intact."""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT id, action, user, details, type, timestamp, row_hash FROM audit_logs ORDER BY rowid ASC")
@@ -291,6 +292,33 @@ def verify_audit_chain() -> dict[str, Any]:
         stored = row["row_hash"]
         if stored and stored != expected:
             return {"chain_valid": False, "tampered_at": row["id"], "total_entries": len(rows)}
+        prev_hash = stored
+    return {"chain_valid": True, "tampered_at": None, "total_entries": len(rows)}
+
+
+def verify_review_chain() -> dict[str, Any]:
+    """Recompute the review decisions hash chain and report whether it is intact."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT case_id, parcel_id, decision, reviewer, note, version, created_at, row_hash FROM review_decisions ORDER BY rowid ASC")
+    rows = cursor.fetchall()
+    conn.close()
+
+    prev_hash = "0" * 64
+    for row in rows:
+        row_data = {
+            "case_id": row["case_id"],
+            "parcel_id": row["parcel_id"],
+            "decision": row["decision"],
+            "reviewer": row["reviewer"],
+            "note": row["note"],
+            "version": row["version"],
+            "created_at": row["created_at"],
+        }
+        expected = _sha256_row(prev_hash, row_data)
+        stored = row["row_hash"]
+        if stored and stored != expected:
+            return {"chain_valid": False, "tampered_at": f"case_{row['case_id']}_v{row['version']}", "total_entries": len(rows)}
         prev_hash = stored
     return {"chain_valid": True, "tampered_at": None, "total_entries": len(rows)}
 

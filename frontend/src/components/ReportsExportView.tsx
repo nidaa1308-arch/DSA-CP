@@ -153,7 +153,7 @@ Status             : ${investigation?.status || "IN_PROGRESS"} (Tamper-Evident L
   };
 
   const handleDownloadAuditLog = async () => {
-    let rows = ["id,action,actor,details,timestamp,row_hash"];
+    let rows: string[] = [];
     try {
       const res = await fetch("/api/db/audit");
       if (res.ok) {
@@ -164,10 +164,13 @@ Status             : ${investigation?.status || "IN_PROGRESS"} (Tamper-Evident L
           )];
         }
       }
-    } catch {}
+    } catch (err) {
+      console.error("Audit log retrieval failed:", err);
+    }
 
-    if (rows.length === 1) {
-      rows.push(`"aud-${Date.now()}","Audit Export","System","Audit trail snapshot generated","${new Date().toISOString()}","verified"`);
+    if (rows.length === 0) {
+      alert("No audit log records found yet. Submit review decisions first to generate audit entries.");
+      return;
     }
 
     triggerDownload(

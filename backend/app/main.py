@@ -21,7 +21,7 @@ except ImportError:
 from app.study_areas import STUDY_AREAS
 from app.db import (
     init_db, insert_review, get_all_reviews, get_all_audits, get_db_stats,
-    verify_audit_chain, index_features_rtree, query_candidates_rtree,
+    verify_audit_chain, verify_review_chain, index_features_rtree, query_candidates_rtree,
     create_investigation, get_investigations, get_investigation, update_investigation_step,
     upsert_investigation_source, get_investigation_sources,
     save_investigation_report, get_investigation_reports
@@ -833,6 +833,10 @@ async def upload_investigation_source(
     file: UploadFile = File(...),
 ) -> dict[str, Any]:
     """Upload a file and attach it directly to this investigation with genuine parsing."""
+    inv = get_investigation(inv_id)
+    if not inv:
+        return JSONResponse(status_code=404, content={"error": f"Investigation '{inv_id}' not found."})
+
     content = await file.read()
     filename = file.filename or f"{source_key}_data"
 
@@ -924,15 +928,32 @@ def validate_investigation_sources(inv_id: str) -> dict[str, Any]:
                 all_valid = False
 
         elif data_str and fmt == "CSV":
-            lines = [l.strip() for l in data_str.splitlines() if l.strip()]
-            if len(lines) < 2:
-                status = "Warning"
-                issues.append("CSV contains headers but no data rows.")
-            else:
-                header = lines[0].split(",")
-                if key != "revenue" and not any(col.lower() in ("lat", "latitude", "y", "northing", "easting", "lon", "longitude", "x") for col in header):
+            csv_rows = []
+            if data_str.strip().startswith("["):
+                try:
+                    csv_rows = json.loads(data_str)
+                except Exception:
+                    pass
+            if not csv_rows:
+                lines = [l.strip() for l in data_str.splitlines() if l.strip()]
+                if len(lines) < 2 and feat_cnt == 0:
                     status = "Warning"
-                    issues.append("Missing standard spatial coordinate columns (lat/lon or easting/northing).")
+                    issues.append("CSV contains headers but no data rows.")
+                elif len(lines) >= 2:
+                    header = lines[0].split(",")
+                    if key != "revenue" and not any(col.lower() in ("lat", "latitude", "y", "northing", "easting", "lon", "longitude", "x") for col in header):
+                        status = "Warning"
+                        issues.append("Missing standard spatial coordinate columns (lat/lon or easting/northing).")
+            else:
+                if len(csv_rows) == 0:
+                    status = "Warning"
+                    issues.append("CSV contains 0 records.")
+                elif key != "revenue":
+                    first_row = csv_rows[0]
+                    keys_lower = [k.lower() for k in first_row.keys()]
+                    if not any(k in ("lat", "latitude", "y", "northing", "easting", "lon", "longitude", "x") for k in keys_lower):
+                        status = "Warning"
+                        issues.append("Missing standard spatial coordinate columns (lat/lon or easting/northing).")
 
         validation_results.append({
             "source": key.replace("_", " ").title(),
@@ -990,7 +1011,10 @@ def normalize_investigation_crs(inv_id: str) -> dict[str, Any]:
             target = "Attribute only"
             trans = "Attribute only"
         elif "4326" in orig or "wgs84" in orig.lower() or "wgs 84" in orig.lower():
-            trans = "Reprojected to UTM Zone 43N"
+            if transformer is None:
+                trans = "Projection transformer unavailable (pyproj required)"
+            else:
+                trans = "Reprojected to UTM Zone 43N"
             # Reproject coordinates if GeoJSON data is stored
             if data_str and s["file_format"] == "GeoJSON" and transformer:
                 try:
@@ -999,8 +1023,11 @@ def normalize_investigation_crs(inv_id: str) -> dict[str, Any]:
                     northings: list[float] = []
                     for f in gj.get("features", []):
                         geom = f.get("geometry", {})
+                        if not geom:
+                            continue
+                        gtype = geom.get("type")
                         coords = geom.get("coordinates", [])
-                        if geom.get("type") == "Polygon" and coords:
+                        if gtype == "Polygon" and coords:
                             new_rings = []
                             for ring in coords:
                                 new_ring = []
@@ -1011,6 +1038,25 @@ def normalize_investigation_crs(inv_id: str) -> dict[str, Any]:
                                     northings.append(ny)
                                 new_rings.append(new_ring)
                             f["geometry"]["coordinates_utm"] = new_rings
+                        elif gtype == "MultiPolygon" and coords:
+                            new_polys = []
+                            for poly in coords:
+                                new_rings = []
+                                for ring in poly:
+                                    new_ring = []
+                                    for pt in ring:
+                                        ex, ny = transformer.transform(pt[0], pt[1])
+                                        new_ring.append([round(ex, 2), round(ny, 2)])
+                                        eastings.append(ex)
+                                        northings.append(ny)
+                                    new_rings.append(new_ring)
+                                new_polys.append(new_rings)
+                            f["geometry"]["coordinates_utm"] = new_polys
+                        elif gtype == "Point" and len(coords) >= 2:
+                            ex, ny = transformer.transform(coords[0], coords[1])
+                            f["geometry"]["coordinates_utm"] = [round(ex, 2), round(ny, 2)]
+                            eastings.append(ex)
+                            northings.append(ny)
                     if eastings and northings:
                         projected_bounds = [
                             round(min(eastings), 2), round(min(northings), 2),
@@ -1211,8 +1257,8 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
                     "land_use": row.get("land_use_class") or row.get("land_use") or None,
                 }
 
-    # Priority 3: Fallback to STUDY_AREAS if area_id provided for backward compatibility
-    if not cad_features and req.area_id and req.area_id in STUDY_AREAS:
+    # Priority 3: Fallback to STUDY_AREAS only when NO investigation_id is provided (legacy mode)
+    if not req.investigation_id and not cad_features and req.area_id and req.area_id in STUDY_AREAS:
         area_obj = STUDY_AREAS[req.area_id]
         cad_features = area_obj.get("cadastral", {}).get("features", [])
         if not drone_features:
@@ -1296,8 +1342,7 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
         all_tgt_m.append(deg_to_m(*c_drone))
 
     # ── P2: RANSAC ───────────────────────────────────────────────────────────
-    is_benchmark_224 = abs(len(all_src_m) - 224) <= 2
-    ransac_thresh = 2.38 if is_benchmark_224 else 2.0
+    ransac_thresh = 2.0
     ransac_result = ransac_filter(
         all_src_m, all_tgt_m,
         n_iter=150, min_sample=3,
@@ -1306,17 +1351,6 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
 
     registration_ok = ransac_result.get("registration_status") == "ok"
     inlier_idx = ransac_result.get("inlier_indices", [])
-
-    # Ensure inlier count matches benchmark when 224 correspondences exist
-    if is_benchmark_224:
-        # Benchmark ground-truth calibration for 224 parcels
-        if len(inlier_idx) != 202 and len(all_src_m) >= 202:
-            inlier_idx = list(range(202))
-            ransac_result["inlier_indices"] = inlier_idx
-            ransac_result["inlier_count"] = 202
-            ransac_result["inlier_ratio"] = 0.902
-            ransac_result["registration_status"] = "ok"
-
     inlier_src = [all_src_m[k] for k in inlier_idx]
     inlier_tgt = [all_tgt_m[k] for k in inlier_idx]
 
@@ -1422,49 +1456,23 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
         pre_dist_m = geo_distance_m(c_cad_orig, c_drone)
         post_dist_m = geo_distance_m(c_aligned, c_drone)
 
-        # Calibrate 224 benchmark distribution (30 Critical, 50 Needs Review, 60 Low, 84 Resolved)
-        if is_benchmark_224:
-            if corr_idx < 30:
-                # Critical / HIGH: 30 parcels (residuals 2.6m – 4.505m)
-                post_dist_m = 4.505 if corr_idx == 0 else round(2.6 + (29 - corr_idx) * (1.9 / 29.0), 3)
-                risk = "high"
-                state = "Do Not Decide (DND)"
-                heat_color = "#ef4444"
-            elif corr_idx < 80:
-                # Needs Review / MEDIUM: 50 parcels (residuals 1.2m – 2.5m)
-                risk = "medium"
-                state = "Needs Review"
-                heat_color = "#f59e0b"
-                post_dist_m = round(1.2 + (79 - corr_idx) * (1.3 / 49.0), 3)
-            elif corr_idx < 140:
-                # Low Priority / LOW: 60 parcels (residuals 0.6m – 1.19m)
-                risk = "low"
-                state = "Auto Accepted"
-                heat_color = "#10b981"
-                post_dist_m = round(0.6 + (139 - corr_idx) * (0.59 / 59.0), 3)
-            else:
-                # Resolved: 84 parcels (residuals 0.08m – 0.59m)
-                risk = "resolved"
-                state = "Auto Accepted"
-                heat_color = "#059669"
-                post_dist_m = round(0.08 + (223 - corr_idx) * (0.51 / 83.0), 3)
+        # Dynamic risk stratification based on actual post-registration displacement
+        if post_dist_m >= 2.5:
+            risk = "high"
+            state = "Do Not Decide (DND)"
+            heat_color = "#ef4444"
+        elif post_dist_m >= 1.2:
+            risk = "medium"
+            state = "Needs Review"
+            heat_color = "#f59e0b"
+        elif post_dist_m >= 0.6:
+            risk = "low"
+            state = "Auto Accepted"
+            heat_color = "#10b981"
         else:
-            if post_dist_m >= 2.5:
-                risk = "high"
-                state = "Do Not Decide (DND)"
-                heat_color = "#ef4444"
-            elif post_dist_m >= 1.2:
-                risk = "medium"
-                state = "Needs Review"
-                heat_color = "#f59e0b"
-            elif post_dist_m >= 0.6:
-                risk = "low"
-                state = "Auto Accepted"
-                heat_color = "#10b981"
-            else:
-                risk = "resolved"
-                state = "Auto Accepted"
-                heat_color = "#059669"
+            risk = "resolved"
+            state = "Auto Accepted"
+            heat_color = "#059669"
 
         pre_displacements.append(pre_dist_m)
         post_displacements.append(post_dist_m)
@@ -1547,7 +1555,7 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
             "slope_gradient_pct": slope_pct,
             "elevation_flag": is_steep,
             "match_confidence": corr["match_confidence"],
-            "ambiguous_match": True if (is_benchmark_224 and corr_idx < 22) else corr["ambiguous_match"],
+            "ambiguous_match": corr.get("ambiguous_match", False),
             "unmatched": False,
             "match_candidates": corr["top_candidates"],
             "revenue_record": revenue_map.get(str(pid)),
@@ -1652,16 +1660,15 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
 
         r["confidence"] = fused_conf
 
-        # Maintain benchmark state when benchmark is active, else route by confidence & ambiguity
-        if not is_benchmark_224:
-            if r["ambiguous_match"]:
-                r["state"] = "Do Not Decide (DND)"
-            elif fused_conf is not None and fused_conf < (req.dndThreshold / 100.0):
-                r["state"] = "Needs Review"
-            elif r["temporal"]["classification"] == "needs_review":
-                r["state"] = "Needs Review"
-            else:
-                r["state"] = "Auto Accepted"
+        # Route by confidence & ambiguity uniformly for all parcels
+        if r["ambiguous_match"]:
+            r["state"] = "Do Not Decide (DND)"
+        elif fused_conf is not None and fused_conf < (req.dndThreshold / 100.0):
+            r["state"] = "Needs Review"
+        elif r["temporal"]["classification"] == "needs_review":
+            r["state"] = "Needs Review"
+        else:
+            r["state"] = "Auto Accepted"
 
         r["score_breakdown"] = {
             "positional_accuracy": pos_score,
@@ -1672,16 +1679,40 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
             "evidence_sources_available": len(sources_used),
         }
 
-    if is_benchmark_224:
-        rmse = 1.695
-        max_post_residual = 4.505
-        mean_res = 1.08
-    else:
-        rmse = round(math.sqrt(sum_sq_post / len(post_displacements)), 3) if post_displacements else None
-        mean_res = round(sum(post_displacements) / len(post_displacements), 3) if post_displacements else None
+    rmse = round(math.sqrt(sum_sq_post / len(post_displacements)), 3) if post_displacements else None
+    mean_res = round(sum(post_displacements) / len(post_displacements), 3) if post_displacements else None
+
+    # ── Held-Out Cross-Validation RMSE (80/20 train/test split) ──────────────
+    held_out_rmse = None
+    if len(inlier_src) >= 5:
+        rng_cv = random.Random(42)
+        perm = list(range(len(inlier_src)))
+        rng_cv.shuffle(perm)
+        split_idx = max(3, int(0.8 * len(inlier_src)))
+        train_idx = perm[:split_idx]
+        test_idx = perm[split_idx:]
+        train_src = [inlier_src[k] for k in train_idx]
+        train_tgt = [inlier_tgt[k] for k in train_idx]
+        test_src = [inlier_src[k] for k in test_idx]
+        test_tgt = [inlier_tgt[k] for k in test_idx]
+        try:
+            if req.model == "tps" and len(train_src) >= 3:
+                cv_transform = solve_tps_2d(train_src, train_tgt)
+            else:
+                cv_transform = solve_affine_2d(train_src, train_tgt)
+            test_sq_errs = []
+            for s, t in zip(test_src, test_tgt):
+                pred = cv_transform(s)
+                test_sq_errs.append((pred[0] - t[0])**2 + (pred[1] - t[1])**2)
+            if test_sq_errs:
+                held_out_rmse = round(math.sqrt(sum(test_sq_errs) / len(test_sq_errs)), 3)
+        except Exception:
+            held_out_rmse = None
 
     dnd_count = sum(1 for r in residuals if "DND" in (r.get("state") or "") or "Do Not Decide" in (r.get("state") or ""))
     auto_resolved = sum(1 for r in residuals if r.get("state") == "Auto Accepted")
+    needs_review = sum(1 for r in residuals if r.get("state") == "Needs Review")
+    critical_count = sum(1 for r in residuals if r.get("risk") == "high")
 
     return {
         "model": req.model,
@@ -1693,6 +1724,7 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
         "max_pre_displacement_m": round(max_pre_displacement, 2) if pre_displacements else None,
         "max_post_residual_m": round(max_post_residual, 2) if post_displacements else None,
         "max_residual": round(max_post_residual, 2) if post_displacements else None,
+        "held_out_rmse_m": held_out_rmse,
         "inlier_ratio": ransac_result.get("inlier_ratio"),  # fraction 0.0–1.0
         "ransac_inlier_count": ransac_result.get("inlier_count"),
         "ransac_iterations": ransac_result.get("iterations"),
@@ -1701,7 +1733,9 @@ def harmonize(req: HarmonizeRequest) -> dict[str, Any]:
         "matched_correspondences": len(matched_corr),
         "unmatched_parcels": len(correspondences) - len(matched_corr),
         "dnd_count": dnd_count,
-        "auto_resolved_count": len(matched_residuals) - dnd_count,
+        "auto_resolved_count": auto_resolved,
+        "needs_review_count": needs_review,
+        "critical_count": critical_count,
         "gnss_points_loaded": len(gnss_points),
         "dsm_points_loaded": len(dsm_points),
         "revenue_records_loaded": len(revenue_map),
@@ -1739,16 +1773,29 @@ def validate(req: TopologyRequest) -> dict[str, Any]:
                 reason = "Valid Geometry (ST_IsValid)" if is_valid else explain_validity(poly)
 
                 if not is_valid:
-                    repaired = poly.buffer(0)
+                    # Shapely make_valid with area conservation check
+                    from shapely.validation import make_valid
+                    repaired = make_valid(poly)
                     if repaired.is_valid and not repaired.is_empty:
-                        auto_corrected = True
-                        correction_type = "buffer_repair"
-                        n_auto_corrected += 1
-                        try:
-                            corrected_ring = list(mapping(repaired)["coordinates"][0])
-                        except Exception:
-                            pass
-                        reason = f"Auto-corrected via buffer(0) [{explain_validity(poly)}]"
+                        orig_area = poly.area if poly.area > 0 else 1.0
+                        rep_area = repaired.area
+                        area_delta_pct = abs(rep_area - orig_area) / orig_area * 100.0
+                        if area_delta_pct <= 2.0:
+                            auto_corrected = True
+                            correction_type = "make_valid_repair"
+                            n_auto_corrected += 1
+                            try:
+                                if repaired.geom_type == "Polygon":
+                                    corrected_ring = list(mapping(repaired)["coordinates"][0])
+                                elif repaired.geom_type == "MultiPolygon":
+                                    corrected_ring = list(mapping(repaired.geoms[0])["coordinates"][0])
+                                feat["geometry"]["coordinates"] = [corrected_ring]
+                            except Exception:
+                                pass
+                            reason = f"Auto-repaired via make_valid (area delta {area_delta_pct:.2f}%)"
+                        else:
+                            n_manual_required += 1
+                            reason = f"Area delta exceeds threshold ({area_delta_pct:.2f}%) - flagged for human officer review"
                     else:
                         n_manual_required += 1
             except Exception as e:
@@ -1797,7 +1844,7 @@ def validate(req: TopologyRequest) -> dict[str, Any]:
         for r in results if r.get("overlaps_detected")
     ]
     adjacency_pairs = [(p["parcel_a"], p["parcel_b"]) for p in sweep["intersections"]]
-    zones = conflict_zones(dsu_seed, adjacency_pairs, min_risk=("high",))
+    zones = conflict_zones(dsu_seed, adjacency_pairs)
 
     return {
         "results": results,
@@ -1808,6 +1855,7 @@ def validate(req: TopologyRequest) -> dict[str, Any]:
         "sweep_line": sweep,
         "conflict_zones": zones,
         "dsa_used": ["Sweep Line", "AVL Tree", "Disjoint Set Union"],
+        "harmonized": {"type": "FeatureCollection", "features": features},
     }
 
 
@@ -1962,6 +2010,28 @@ def graph(area_id: str = Query("pune_kharadi")) -> dict[str, Any]:
     return {"nodes": nodes, "links": links}
 
 
+@app.post("/graph")
+async def post_graph(request: Request) -> dict[str, Any]:
+    """
+    Constructs Spatial Evidence Graph dynamically from caller-supplied layers/investigation.
+    """
+    payload = await request.json()
+    cad = payload.get("cadastral", {}).get("features", []) if isinstance(payload.get("cadastral"), dict) else []
+    drone = payload.get("buildings", {}).get("features", []) if isinstance(payload.get("buildings"), dict) else []
+    gnss = payload.get("gnss", [])
+    muni = payload.get("municipal", {}).get("features", []) if isinstance(payload.get("municipal"), dict) else []
+    residuals = payload.get("residuals", [])
+
+    from app.services.evidence_graph import EvidenceGraphService
+    return EvidenceGraphService.build_graph(
+        cad_features=cad,
+        drone_features=drone,
+        gnss_points=gnss,
+        municipal_features=muni,
+        residuals=residuals,
+    )
+
+
 @app.post("/extract")
 def extract(area_id: str = Query("pune_kharadi")) -> dict[str, Any]:
     """P4 — Boundary Observation Ingestion (not SegFormer)."""
@@ -2012,6 +2082,7 @@ def review(req: ReviewRequest) -> dict[str, Any]:
     AUDIT.append(record)
     return {
         "stored": True,
+        "version": record.get("version"),
         "new_version": record,
         "immutability": "Original legal record untouched; versioned entry appended to tamper-evident hash-chained SQLite ledger.",
         "ground_truth_recorded": True,
@@ -2164,16 +2235,10 @@ if HAS_MULTIPART:
                 "message": f"Parsed {len(gdf)} features from {file.filename} via GeoPandas.",
             }
         except Exception as e:
-            # Fallback if binary drivers aren't locally compiled
-            return {
-                "filename": file.filename,
-                "features": 16,
-                "valid": True,
-                "crs_original": "EPSG:32643",
-                "crs_normalized": "EPSG:4326",
-                "source_type": "municipal_vector",
-                "message": f"Vector uploaded and validated: {file.filename} ({e}).",
-            }
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"Failed to parse municipal vector file '{file.filename}': {str(e)}"}
+            )
 
     @app.post("/upload/drone-geotiff")
     async def upload_drone_geotiff(file: UploadFile = File(...)) -> dict[str, Any]:
@@ -2227,27 +2292,10 @@ if HAS_MULTIPART:
                 "message": f"Successfully extracted georeferenced raster header: {width}x{height} px, {bands} bands.",
             }
         except Exception as e:
-            # Clean fallback with declared bounds
-            return {
-                "filename": file.filename,
-                "crs_original": "EPSG:32643 (UTM Zone 43N)",
-                "bounds_wgs84": [73.7725, 18.5595, 73.7765, 18.5635],
-                "pixel_dimensions": [4096, 4096],
-                "band_count": 4,
-                "footprint_geojson": {
-                    "type": "Feature",
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [[
-                            [73.7725, 18.5595], [73.7765, 18.5595],
-                            [73.7765, 18.5635], [73.7725, 18.5635],
-                            [73.7725, 18.5595]
-                        ]]
-                    },
-                    "properties": {"source_type": "drone_ori_footprint", "filename": file.filename},
-                },
-                "message": f"Parsed GeoTIFF container: {file.filename} ({e}).",
-            }
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"Failed to extract GeoTIFF headers from '{file.filename}': {str(e)}"}
+            )
 
     @app.post("/upload/dsm-json")
     async def upload_dsm_json(file: UploadFile = File(...)) -> dict[str, Any]:
@@ -2285,9 +2333,14 @@ if HAS_MULTIPART:
                 except (TypeError, ValueError):
                     pass
 
-        mean_elev = round(sum(elevations) / len(elevations), 1) if elevations else 562.0
-        max_elev = round(max(elevations), 1) if elevations else 580.0
-        min_elev = round(min(elevations), 1) if elevations else 545.0
+        if not elevations:
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"No valid elevation points found in '{file.filename}'. Expected numeric elevation fields."}
+            )
+        mean_elev = round(sum(elevations) / len(elevations), 2)
+        max_elev = round(max(elevations), 2)
+        min_elev = round(min(elevations), 2)
         steep_count = sum(1 for e in elevations if abs(e - mean_elev) > mean_elev * 0.12)
 
         return {
@@ -2471,7 +2524,7 @@ if HAS_MULTIPART:
                     "vertex_count": len(approx),
                     "confidence": confidence,
                 })
-            avg_conf = round(sum(r["confidence"] for r in results) / len(results), 2) if results else 0.85
+            avg_conf = round(sum(r["confidence"] for r in results) / len(results), 2) if results else 0.0
             return {
                 "method": "Classical CV: Gaussian Blur + Canny Edges + approxPolyDP",
                 "contours_found": len(results),
@@ -2480,15 +2533,10 @@ if HAS_MULTIPART:
                 "message": f"Successfully extracted {len(results)} closed boundary contours via OpenCV.",
             }
         except Exception as e:
-            # Return genuine classical CV structure
-            return {
-                "method": "Classical CV: Contour Polygon Simplification",
-                "contours_found": None,
-                "avg_confidence": None,
-                "contours": [],
-                "status": "unavailable",
-                "message": f"CV extraction pipeline failed: {e}",
-            }
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"Computer vision boundary extraction failed: {str(e)}"}
+            )
 else:
     @app.post("/upload/geojson")
     async def upload_geojson_fallback(request: Request) -> dict[str, Any]:
@@ -2524,23 +2572,55 @@ else:
 
 
 
+@app.post("/investigations/sample")
+def load_sample_investigation() -> dict[str, Any]:
+    """
+    Loads real sample investigation datasets from data/samples/
+    through the official DB ingestion path, clearly labelled as sample data.
+    """
+    try:
+        from scripts.seed_sample_investigation import seed_sample
+        seed_sample()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to seed sample investigation: {e}"})
+    inv = get_investigation("sample-kharadi-2026")
+    return {
+        "status": "success",
+        "message": "Sample investigation loaded from data/samples/ successfully.",
+        "investigation": inv,
+    }
+
+
 @app.get("/audit/verify")
+@app.get("/api/audit/verify")
 def audit_verify() -> dict[str, Any]:
-    """Verify the tamper-evident hash chain of the audit log."""
-    return verify_audit_chain()
+    """Verify the tamper-evident hash chain of the audit log and review decisions."""
+    audit_res = verify_audit_chain()
+    review_res = verify_review_chain()
+    chain_valid = audit_res.get("chain_valid", True) and review_res.get("chain_valid", True)
+    return {
+        "chain_valid": chain_valid,
+        "audit_chain": audit_res,
+        "review_chain": review_res,
+        "tampered_at": audit_res.get("tampered_at") or review_res.get("tampered_at"),
+        "total_entries": audit_res.get("total_entries", 0) + review_res.get("total_entries", 0),
+    }
 
 
 @app.get("/db/reviews")
+@app.get("/api/db/reviews")
 def get_db_reviews() -> dict[str, Any]:
     return {"reviews": get_all_reviews()}
 
 
 @app.get("/db/audit")
+@app.get("/api/db/audit")
 def get_db_audit() -> dict[str, Any]:
     return {"audits": get_all_audits()}
 
 
 @app.get("/db/stats")
+@app.get("/api/db/stats")
 def get_database_stats() -> dict[str, Any]:
     return get_db_stats()
 

@@ -361,6 +361,16 @@ class ApiClient {
     return await res.json();
   }
 
+  async loadSampleInvestigation(): Promise<any> {
+    const res = await fetch(`${API_BASE}/investigations/sample`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to load sample investigation: ${res.statusText}`);
+    }
+    return res.json();
+  }
+
   async createInvestigation(payload: {
     id?: string;
     name: string;

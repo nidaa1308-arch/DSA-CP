@@ -8,6 +8,7 @@ PS-26013 requirement for spatial + non-spatial dataset integration.
 Label: 'Simulated Revenue Attribute Layer' — data is realistic but synthetic.
 """
 from __future__ import annotations
+import hashlib
 import random
 from typing import Any
 
@@ -24,7 +25,8 @@ rng = random.Random(42)  # deterministic seed for reproducibility
 
 
 def _make_record(parcel_id: str, pid_num: int, area_id: str) -> dict[str, Any]:
-    rng.seed(pid_num * 17 + hash(area_id) % 997)
+    area_seed = int(hashlib.sha256(area_id.encode("utf-8")).hexdigest()[:8], 16) % 997
+    rng.seed(pid_num * 17 + area_seed)
     year = rng.randint(1982, 2023)
     month = rng.randint(1, 12)
     day = rng.randint(1, 28)
