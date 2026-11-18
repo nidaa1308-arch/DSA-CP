@@ -134,9 +134,15 @@ export const App: React.FC = () => {
             }
           }
           setCustomLayers(restoredLayers);
+          if (Object.keys(restoredLayers).length > 0) {
+            setTimeout(() => {
+              runHarmonization({ customLayers: restoredLayers });
+            }, 60);
+          }
         } else {
           setUploadedSources([]);
           setCustomLayers({});
+          setHarmonizeResult(null);
         }
         showToast(`Loaded investigation ${inv.id}: ${inv.name}`);
       }
@@ -398,6 +404,35 @@ export const App: React.FC = () => {
     runHarmonization({ customLayers: updatedCustom });
   };
 
+  const handleUploadBatch = (batchLayers: Record<string, any>, batchSources: any[], autoHarmonizeRes?: any) => {
+    setCustomLayers((prev) => {
+      const merged = { ...prev, ...batchLayers };
+      if (autoHarmonizeRes) {
+        setHarmonizeResult(autoHarmonizeRes);
+      } else {
+        setTimeout(() => {
+          runHarmonization({ customLayers: merged });
+        }, 60);
+      }
+      return merged;
+    });
+
+    setUploadedSources((prev) => {
+      const names = new Set(batchSources.map((s) => s.source.toLowerCase()));
+      const remaining = prev.filter((s) => !names.has(s.source.toLowerCase()));
+      return [...remaining, ...batchSources];
+    });
+
+    addAuditEntry(
+      makeAuditEntry(
+        "ZIP Package Ingested",
+        `Ingested ${Object.keys(batchLayers).length} spatial layers from package. Full geometric alignment triggered.`,
+        "upload"
+      )
+    );
+    showToast(`✓ Ingested ${Object.keys(batchLayers).length} layers from ZIP package. Harmonization active.`);
+  };
+
   const crsRows = uploadedSources.map((s) => ({
     source: s.source,
     orig: s.crs,
@@ -495,6 +530,9 @@ export const App: React.FC = () => {
               onSelectParcel={(id) => { setSelectedParcelId(id); setCurrentScreen("review"); }}
               onNavigate={setCurrentScreen}
               onLoadSample={handleLoadSampleInvestigation}
+              investigations={investigationsList}
+              activeInvestigation={activeInvestigation}
+              onSelectInvestigation={handleSelectInvestigation}
             />
           )}
           {currentScreen === "new_investigation" && (
@@ -507,6 +545,7 @@ export const App: React.FC = () => {
             <UploadIngestView
               onNormalize={handleNormalizeTrigger}
               onUploadData={handleUploadData}
+              onUploadBatch={handleUploadBatch}
               onNavigate={setCurrentScreen}
               onContinue={() => setCurrentScreen("validation")}
               investigation={activeInvestigation}

@@ -26,6 +26,9 @@ interface DashboardViewProps {
   onNavigate: (screen: Screen) => void;
   onSelectParcel: (id: string) => void;
   onLoadSample?: () => void;
+  investigations?: any[];
+  activeInvestigation?: any;
+  onSelectInvestigation?: (invId: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -33,6 +36,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigate,
   onSelectParcel,
   onLoadSample,
+  investigations = [],
+  activeInvestigation,
+  onSelectInvestigation,
 }) => {
   const [activeLayersTab, setActiveLayersTab] = useState<"layers" | "legend">("layers");
   const [showLayerPanel, setShowLayerPanel] = useState(false);
@@ -89,11 +95,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="welcome-actions">
-          {/* Location Selector Pill */}
-          <div className="location-pill-image2">
+          {/* Investigation Selector Dropdown Pill */}
+          <div className="location-pill-image2 investigation-dropdown-pill" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
             <MapPin size={15} className="location-icon" />
-            <span>{data.name || "Pune, Maharashtra"}</span>
-            <ChevronDown size={14} className="chevron-icon" />
+            <select
+              value={activeInvestigation?.id || ""}
+              onChange={(e) => {
+                if (e.target.value === "__new__") {
+                  onNavigate("new_investigation");
+                } else if (e.target.value) {
+                  onSelectInvestigation?.(e.target.value);
+                }
+              }}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#0f172a",
+                fontWeight: 600,
+                fontSize: "13px",
+                cursor: "pointer",
+                outline: "none",
+                maxWidth: "260px",
+              }}
+              title="Select Investigation"
+            >
+              {investigations && investigations.length > 0 ? (
+                investigations.map((inv) => (
+                  <option key={inv.id} value={inv.id}>
+                    {inv.id}: {inv.name || inv.area_name || "Investigation"}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>
+                  No Investigations Yet
+                </option>
+              )}
+              <option value="__new__">+ New Investigation</option>
+            </select>
+            <ChevronDown size={14} className="chevron-icon" style={{ pointerEvents: "none" }} />
           </div>
 
           {/* Notification Bell */}

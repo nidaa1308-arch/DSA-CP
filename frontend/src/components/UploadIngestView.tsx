@@ -28,6 +28,7 @@ interface UploadIngestViewProps {
   onNormalize?: () => void;
   onContinue?: () => void;
   onUploadData?: (layerType: "cadastral" | "buildings" | "control" | "municipal" | "utilities" | "dsm" | "revenue" | "drone" | "ori" | "ground_truth", geojson: any, meta: any) => void;
+  onUploadBatch?: (batchLayers: Record<string, any>, batchSources: any[], harmonizeResult?: any) => void;
   investigation?: any;
 }
 
@@ -38,6 +39,7 @@ export const UploadIngestView: React.FC<UploadIngestViewProps> = ({
   onNormalize,
   onContinue,
   onUploadData,
+  onUploadBatch,
   investigation,
 }) => {
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
@@ -67,6 +69,9 @@ export const UploadIngestView: React.FC<UploadIngestViewProps> = ({
 
       if (res.layers && typeof res.layers === "object") {
         const newUploadedMap = { ...uploadedMap };
+        const batchLayers: Record<string, any> = {};
+        const batchSources: any[] = [];
+
         for (const [key, lData] of Object.entries(res.layers as Record<string, any>)) {
           const info = {
             filename: lData.filename || `${key}.geojson`,
@@ -77,12 +82,26 @@ export const UploadIngestView: React.FC<UploadIngestViewProps> = ({
           };
           newUploadedMap[key] = info;
 
-          if (onUploadData) {
-            const mappedType = key === "gnss" ? "control" : (key as any);
-            onUploadData(mappedType, lData.data || { type: "FeatureCollection", features: [] }, info);
-          }
+          const mappedType = key === "gnss" ? "control" : (key as any);
+          batchLayers[mappedType] = lData.data || { type: "FeatureCollection", features: [] };
+          batchSources.push({
+            source: key.charAt(0).toUpperCase() + key.slice(1),
+            file: info.filename,
+            format: info.file_format,
+            crs: lData.crs || "EPSG:4326",
+            features: String(info.features),
+            status: "Valid" as const,
+          });
         }
         setUploadedMap(newUploadedMap);
+
+        if (onUploadBatch) {
+          onUploadBatch(batchLayers, batchSources, res.harmonization);
+        } else if (onUploadData) {
+          for (const [layerKey, layerData] of Object.entries(batchLayers)) {
+            onUploadData(layerKey as any, layerData, newUploadedMap[layerKey]);
+          }
+        }
       }
     } catch (err: any) {
       setUploadStatus(`Error unpacking ZIP: ${err?.message || err}`);

@@ -889,18 +889,33 @@ def upload_investigation_zip(inv_id: str, file: UploadFile = File(...)) -> dict[
         low = fname.lower()
         if "__macosx" in low or low.startswith(".") or "/." in low:
             return None
+        # Cadastral parcels
         if any(k in low for k in ("cadastral", "parcel", "revenue_cadastre")):
             return "cadastral"
-        if any(k in low for k in ("footprint", "building", "drone")):
+        # Building footprints (vector polygons, not raster tif)
+        if (any(k in low for k in ("footprint", "building")) or "physical" in low) and not any(k in low for k in (".tif", ".tiff", "raster")):
             return "buildings"
-        if any(k in low for k in ("gnss", "control", "rtk", "gcp")):
+        # Drone / ORI Orthomosaic
+        if any(k in low for k in ("orthomosaic", "ori", "drone")) or low.endswith(".tif") or low.endswith(".tiff"):
+            return "drone"
+        # GNSS control points
+        if any(k in low for k in ("gnss", "control", "rtk", "cors", "gcp")):
             return "gnss"
+        # Revenue records (7/12 ROR)
         if any(k in low for k in ("revenue", "7_12", "712", "ror", "khata", "khasra")):
             return "revenue"
-        if any(k in low for k in ("municipal", "road", "utility", "osm")):
+        # Utility network
+        if any(k in low for k in ("utility", "pipe", "power", "water")):
+            return "utilities"
+        # Municipal GIS
+        if any(k in low for k in ("municipal", "road", "osm", "ward")) or low.endswith(".gpkg"):
             return "municipal"
-        if any(k in low for k in ("dsm", "dtm", "elevation")):
+        # DSM / DTM
+        if any(k in low for k in ("dsm", "dtm", "elevation", "slope")):
             return "dsm"
+        # Ground Truth
+        if any(k in low for k in ("ground_truth", "gt")):
+            return "ground_truth"
         return None
 
     for item in zf.infolist():
@@ -915,6 +930,10 @@ def upload_investigation_zip(inv_id: str, file: UploadFile = File(...)) -> dict[
         file_bytes = zf.read(item)
         parsed = parse_investigation_file_content(fname, file_bytes, source_key)
         target_crs = "EPSG:32643" if source_key != "revenue" else "Attribute only"
+
+        # If we already have this source_key mapped, only replace if new file has more features
+        if source_key in mapped_layers and mapped_layers[source_key]["features_count"] >= parsed["features_count"]:
+            continue
 
         rec = upsert_investigation_source(
             inv_id=inv_id,
@@ -948,16 +967,26 @@ def upload_investigation_zip(inv_id: str, file: UploadFile = File(...)) -> dict[
         }
 
     update_investigation_step(inv_id, 2)
+    
+    # Auto-run harmonization if cadastral and buildings are present so residuals and conflicts are immediately available
+    harmonization_res = None
+    if "cadastral" in mapped_layers and "buildings" in mapped_layers:
+        try:
+            harmonization_res = harmonize(HarmonizeRequest(investigation_id=inv_id, model="affine"))
+        except Exception as ex:
+            print("Auto-harmonization notice:", ex)
+
     return {
         "status": "success",
         "investigation_id": inv_id,
         "zip_filename": file.filename or "uploaded_package.zip",
         "mapped_count": len(mapped_sources),
         "mapped_sources": mapped_sources,
-        "layers_extracted": [m["source_key"] for m in mapped_sources],
+        "layers_extracted": list(mapped_layers.keys()),
         "layers": mapped_layers,
+        "harmonization": harmonization_res,
         "ignored_files": ignored_files,
-        "message": f"Successfully unpacked zip and mapped {len(mapped_sources)} data source layers.",
+        "message": f"Successfully unpacked zip and mapped {len(mapped_layers)} data source layers.",
     }
 
 
