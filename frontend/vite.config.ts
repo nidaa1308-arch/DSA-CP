@@ -3,6 +3,21 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      "/health": "http://127.0.0.1:8000",
+      "/upload": "http://127.0.0.1:8000",
+      "/harmonize": "http://127.0.0.1:8000",
+      "/validate": "http://127.0.0.1:8000",
+      "/investigations": "http://127.0.0.1:8000",
+      "/dsa": "http://127.0.0.1:8000",
+      "/db": "http://127.0.0.1:8000",
+      "/export": "http://127.0.0.1:8000",
+      "/audit": "http://127.0.0.1:8000",
+      "/review": "http://127.0.0.1:8000",
+    },
+  },
   optimizeDeps: {
     exclude: ["maplibre-gl"]
   },

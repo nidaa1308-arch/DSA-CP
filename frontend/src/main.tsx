@@ -473,18 +473,20 @@ export const App: React.FC = () => {
       <Sidebar currentScreen={currentScreen} onSelectScreen={setCurrentScreen} />
 
       <div className="main-wrapper">
-        <Topbar
-          currentScreen={currentScreen}
-          selectedDistrict={activeInvestigation?.name || "BHUMI-FUSE"}
-          areaIds={AREA_IDS}
-          activeAreaId={activeAreaId}
-          onAreaChange={handleAreaChange}
-          onNavigate={setCurrentScreen}
-          isComputing={isComputing}
-          investigations={investigationsList}
-          activeInvestigation={activeInvestigation}
-          onSelectInvestigation={handleSelectInvestigation}
-        />
+        {currentScreen !== "dashboard" && (
+          <Topbar
+            currentScreen={currentScreen}
+            selectedDistrict={activeInvestigation?.name || "BHUMI-FUSE"}
+            areaIds={AREA_IDS}
+            activeAreaId={activeAreaId}
+            onAreaChange={handleAreaChange}
+            onNavigate={setCurrentScreen}
+            isComputing={isComputing}
+            investigations={investigationsList}
+            activeInvestigation={activeInvestigation}
+            onSelectInvestigation={handleSelectInvestigation}
+          />
+        )}
 
         <main className="main-content">
           {currentScreen === "dashboard" && (

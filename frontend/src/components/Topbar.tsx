@@ -124,9 +124,9 @@ export const Topbar: React.FC<TopbarProps> = ({
 
         {/* User profile pill */}
         <div className="topbar-user-pill">
-          <div className="avatar-dot">NR</div>
+          <div className="avatar-dot">PK</div>
           <div className="user-text">
-            <b>Nitin R.</b>
+            <b>Pranav K.</b>
             <small>Land Records Officer</small>
           </div>
         </div>

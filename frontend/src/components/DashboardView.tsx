@@ -120,8 +120,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="kpi-value-image2">{sourcesCount}</span>
             <span className="kpi-title-image2">Data Sources</span>
           </div>
-          <div className="kpi-trend-pill green">
-            <span>↑ Active</span>
+          <div className={`kpi-trend-pill ${sourcesCount > 0 ? "green" : "teal"}`}>
+            <span>{sourcesCount > 0 ? "↑ Active" : "Pending"}</span>
           </div>
         </div>
 
@@ -134,8 +134,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="kpi-value-image2">{parcelsCount}</span>
             <span className="kpi-title-image2">Parcels Analyzed</span>
           </div>
-          <div className="kpi-trend-pill blue">
-            <span>↑ +12%</span>
+          <div className={`kpi-trend-pill ${parcelsCount > 0 ? "blue" : "teal"}`}>
+            <span>{parcelsCount > 0 ? `↑ ${parcelsCount} Parcels` : "0 Loaded"}</span>
           </div>
         </div>
 
@@ -149,7 +149,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="kpi-title-image2">Conflicts</span>
           </div>
           <div className={`kpi-trend-pill ${conflictsCount === 0 ? "green" : "amber"}`}>
-            <span>{conflictsCount === 0 ? "✓ Resolved" : "⚠ Pending"}</span>
+            <span>{conflictsCount === 0 ? "✓ 0 Conflicts" : `⚠ ${conflictsCount} Flagged`}</span>
           </div>
         </div>
 
@@ -162,8 +162,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="kpi-value-image2">{autoMatchRate}</span>
             <span className="kpi-title-image2">Auto Match Rate</span>
           </div>
-          <div className="kpi-trend-pill purple">
-            <span>↑ +8%</span>
+          <div className={`kpi-trend-pill ${autoMatchRate !== "0%" ? "purple" : "teal"}`}>
+            <span>{autoMatchRate !== "0%" ? `↑ ${autoMatchRate}` : "Pending"}</span>
           </div>
         </div>
 
@@ -176,8 +176,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="kpi-value-image2">{resolutionRate}</span>
             <span className="kpi-title-image2">Resolution Rate</span>
           </div>
-          <div className="kpi-trend-pill teal">
-            <span>↑ +5%</span>
+          <div className={`kpi-trend-pill ${resolutionRate !== "0%" ? "teal" : "amber"}`}>
+            <span>{resolutionRate !== "0%" ? `↑ ${resolutionRate}` : "Pending"}</span>
           </div>
         </div>
       </div>

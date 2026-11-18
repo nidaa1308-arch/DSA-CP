@@ -6,11 +6,18 @@ import type {
 } from "../utils/geoEngine";
 
 let rawBase = (import.meta.env.VITE_API_URL || "").trim();
+if (!rawBase && typeof window !== "undefined") {
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    rawBase = "http://127.0.0.1:8000";
+  } else {
+    rawBase = "";
+  }
+}
 if (rawBase && !rawBase.startsWith("http://") && !rawBase.startsWith("https://")) {
   rawBase = `https://${rawBase}`;
 }
 rawBase = rawBase.replace(/\/+$/, "");
-const API_BASE = rawBase;
+let API_BASE = rawBase;
 
 export interface CustomLayersPayload {
   cadastral?: any;
@@ -54,19 +61,27 @@ class ApiClient {
     if (this.backendAvailable !== null && (now - this.lastCheckTime) < this.CHECK_TTL_MS) {
       return this.backendAvailable;
     }
-    if (!API_BASE) {
-      this.backendAvailable = false;
-      this.lastCheckTime = now;
-      return false;
+    const candidates = [
+      API_BASE ? `${API_BASE}/health` : "/health",
+      "http://127.0.0.1:8000/health",
+      "/health"
+    ];
+    for (const url of candidates) {
+      try {
+        const res = await fetch(url, { method: "GET", signal: AbortSignal.timeout(2000) });
+        if (res.ok) {
+          if (url.startsWith("http")) {
+            API_BASE = url.replace(/\/health$/, "");
+          }
+          this.backendAvailable = true;
+          this.lastCheckTime = now;
+          return true;
+        }
+      } catch {}
     }
-    try {
-      const res = await fetch(`${API_BASE}/health`, { method: "GET", signal: AbortSignal.timeout(2000) });
-      this.backendAvailable = res.ok;
-    } catch {
-      this.backendAvailable = false;
-    }
+    this.backendAvailable = false;
     this.lastCheckTime = now;
-    return this.backendAvailable;
+    return false;
   }
 
   async runHarmonization(params: HarmonizeParams): Promise<HarmonizeResult> {
