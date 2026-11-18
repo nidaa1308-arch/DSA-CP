@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Layers,
   MapPin,
+  Archive,
 } from "lucide-react";
 import { Screen } from "./Sidebar";
 import { api } from "../api/client";
@@ -42,6 +43,53 @@ export const UploadIngestView: React.FC<UploadIngestViewProps> = ({
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedMap, setUploadedMap] = useState<Record<string, any>>({});
+  const [uploadMode, setUploadMode] = useState<"zip" | "individual">("zip");
+  const [isDraggingZip, setIsDraggingZip] = useState(false);
+  const [zipResult, setZipResult] = useState<any>(null);
+
+  const handleZipFile = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".zip")) {
+      setUploadStatus("Please upload a valid .zip package file.");
+      return;
+    }
+    setIsUploading(true);
+    setUploadStatus(`Extracting and classifying layers from ${file.name}...`);
+    try {
+      let res: any;
+      if (investigation?.id) {
+        res = await api.uploadInvestigationZip(investigation.id, file);
+      } else {
+        res = await api.uploadZipPackage(file);
+      }
+      setZipResult(res);
+      const extractedCount = res.layers_extracted?.length || 0;
+      setUploadStatus(`✓ Successfully extracted and classified ${extractedCount} layers from ${file.name}`);
+
+      if (res.layers && typeof res.layers === "object") {
+        const newUploadedMap = { ...uploadedMap };
+        for (const [key, lData] of Object.entries(res.layers as Record<string, any>)) {
+          const info = {
+            filename: lData.filename || `${key}.geojson`,
+            features: lData.features_count || 1,
+            features_count: lData.features_count || 1,
+            file_format: lData.file_format || "GEOJSON",
+            status: "VALID",
+          };
+          newUploadedMap[key] = info;
+
+          if (onUploadData) {
+            const mappedType = key === "gnss" ? "control" : (key as any);
+            onUploadData(mappedType, lData.data || { type: "FeatureCollection", features: [] }, info);
+          }
+        }
+        setUploadedMap(newUploadedMap);
+      }
+    } catch (err: any) {
+      setUploadStatus(`Error unpacking ZIP: ${err?.message || err}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Helper to check if a specific source key is active
   const getSourceInfo = (key: string) => {
@@ -261,6 +309,27 @@ export const UploadIngestView: React.FC<UploadIngestViewProps> = ({
         </div>
       </div>
 
+      {/* Upload Mode Selector (Option A: ZIP Package vs Option B: Individual Files) */}
+      <div className="upload-mode-selector" style={{ marginTop: "20px" }}>
+        <button
+          type="button"
+          className={`upload-mode-tab ${uploadMode === "zip" ? "active" : ""}`}
+          onClick={() => setUploadMode("zip")}
+        >
+          <Archive size={18} />
+          <span>Option A: Upload ZIP Package</span>
+          <span className="badge-recommended">Auto-Classify &amp; Map</span>
+        </button>
+        <button
+          type="button"
+          className={`upload-mode-tab ${uploadMode === "individual" ? "active" : ""}`}
+          onClick={() => setUploadMode("individual")}
+        >
+          <Layers size={18} />
+          <span>Option B: Upload Individual Layer Files</span>
+        </button>
+      </div>
+
       {/* Upload status message */}
       {uploadStatus && (
         <div
@@ -282,7 +351,127 @@ export const UploadIngestView: React.FC<UploadIngestViewProps> = ({
         </div>
       )}
 
-      {/* Upload Cards Grid - 10 NAKSHA Datasets */}
+      {uploadMode === "zip" ? (
+        <div>
+          <div
+            className={`zip-dropzone-box ${isDraggingZip ? "drag-over" : ""}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDraggingZip(true);
+            }}
+            onDragLeave={() => setIsDraggingZip(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDraggingZip(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f) handleZipFile(f);
+            }}
+            onClick={() => {
+              document.getElementById("zip-file-input")?.click();
+            }}
+          >
+            <input
+              id="zip-file-input"
+              type="file"
+              accept=".zip"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleZipFile(f);
+              }}
+            />
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+              <div
+                style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: "50%",
+                  background: "#ecfdf5",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#059669",
+                  boxShadow: "0 4px 12px rgba(16, 185, 129, 0.15)",
+                }}
+              >
+                <Archive size={30} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", margin: "0 0 6px 0" }}>
+                  Drag &amp; Drop Land Record .ZIP Package Here
+                </h3>
+                <p style={{ fontSize: 13, color: "#64748b", maxWidth: 520, margin: "0 auto", lineHeight: 1.5 }}>
+                  Upload a single zip package containing cadastral parcel boundaries, drone/building footprints, GNSS control points, municipal vectors, or 7/12 records. The backend engine automatically unpacks, inspects geometry, normalizes CRS, and maps every layer into the investigation pipeline.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-emerald"
+                style={{ marginTop: 6 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  document.getElementById("zip-file-input")?.click();
+                }}
+              >
+                <Upload size={14} />
+                <span>Select .ZIP Archive File</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Mapped Layers Preview if Zip is uploaded */}
+          {zipResult && zipResult.layers_extracted && (
+            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px 24px", marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <h4 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                    Extracted &amp; Classified Spatial Layers ({zipResult.layers_extracted.length})
+                  </h4>
+                  <span style={{ fontSize: 12.5, color: "#64748b" }}>
+                    Package: <strong>{zipResult.zip_filename || "Uploaded ZIP"}</strong> &bull; All layers successfully parsed and assigned
+                  </span>
+                </div>
+                <span className="badge-pill success">
+                  <CheckCircle2 size={12} /> Auto-Classified
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+                {Object.entries(zipResult.layers || {}).map(([layerKey, layerInfo]: [string, any]) => (
+                  <div
+                    key={layerKey}
+                    style={{
+                      background: "#f8fafc",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: 10,
+                      padding: "12px 16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <strong style={{ fontSize: 13, color: "#0f172a", textTransform: "capitalize" }}>
+                        {layerKey === "gnss" ? "GNSS Control Points" : layerKey}
+                      </strong>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#059669", background: "#dcfce7", padding: "2px 8px", borderRadius: 6 }}>
+                        {layerInfo.file_format || "GEOJSON"}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 12, color: "#64748b", wordBreak: "break-all" }}>
+                      {layerInfo.filename}
+                    </span>
+                    <span style={{ fontSize: 11.5, color: "#047857", fontWeight: 600 }}>
+                      ✓ {layerInfo.features_count ?? 1} features ingested
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+      /* Upload Cards Grid - 10 NAKSHA Datasets */
       <div className="upload-cards-grid" style={{ marginTop: "16px" }}>
         {/* 1. Cadastral Layer */}
         <div className="upload-source-card" style={{ borderColor: "#10b981" }}>
@@ -534,6 +723,7 @@ export const UploadIngestView: React.FC<UploadIngestViewProps> = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* Footer Navigation */}
       <div className="validation-footer-bar" style={{ marginTop: "24px" }}>

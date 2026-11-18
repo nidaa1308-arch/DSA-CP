@@ -863,6 +863,123 @@ async def upload_investigation_source(
     }
 
 
+@app.post("/investigations/{inv_id}/upload-zip")
+def upload_investigation_zip(inv_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    """
+    Direct ZIP archive ingestion:
+    Unpacks archive in-memory, inspects files, and automatically maps
+    each file to its corresponding layer (cadastral, buildings, gnss, revenue, municipal, dsm).
+    """
+    inv = get_investigation(inv_id)
+    if not inv:
+        return JSONResponse(status_code=404, content={"error": f"Investigation '{inv_id}' not found."})
+
+    content = file.file.read()
+    import zipfile, io
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(content))
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Invalid zip file: {e}"})
+
+    mapped_sources = []
+    mapped_layers = {}
+    ignored_files = []
+
+    def classify_filename(fname: str) -> str | None:
+        low = fname.lower()
+        if "__macosx" in low or low.startswith(".") or "/." in low:
+            return None
+        if any(k in low for k in ("cadastral", "parcel", "revenue_cadastre")):
+            return "cadastral"
+        if any(k in low for k in ("footprint", "building", "drone")):
+            return "buildings"
+        if any(k in low for k in ("gnss", "control", "rtk", "gcp")):
+            return "gnss"
+        if any(k in low for k in ("revenue", "7_12", "712", "ror", "khata", "khasra")):
+            return "revenue"
+        if any(k in low for k in ("municipal", "road", "utility", "osm")):
+            return "municipal"
+        if any(k in low for k in ("dsm", "dtm", "elevation")):
+            return "dsm"
+        return None
+
+    for item in zf.infolist():
+        if item.is_dir():
+            continue
+        fname = Path(item.filename).name
+        source_key = classify_filename(item.filename)
+        if not source_key:
+            ignored_files.append(item.filename)
+            continue
+
+        file_bytes = zf.read(item)
+        parsed = parse_investigation_file_content(fname, file_bytes, source_key)
+        target_crs = "EPSG:32643" if source_key != "revenue" else "Attribute only"
+
+        rec = upsert_investigation_source(
+            inv_id=inv_id,
+            source_key=source_key,
+            filename=fname,
+            file_format=parsed["file_format"],
+            original_crs=parsed["original_crs"],
+            target_crs=target_crs,
+            features_count=parsed["features_count"],
+            status="VALID" if parsed["features_count"] > 0 else "WARNING",
+            data_json=parsed["data_json"],
+        )
+        mapped_sources.append({
+            "source_key": source_key,
+            "filename": fname,
+            "features_count": parsed["features_count"],
+            "crs": parsed["original_crs"],
+            "status": "mapped"
+        })
+        try:
+            layer_data = json.loads(parsed["data_json"]) if parsed.get("data_json") else None
+        except Exception:
+            layer_data = None
+        mapped_layers[source_key] = {
+            "source_key": source_key,
+            "filename": fname,
+            "features_count": parsed["features_count"],
+            "file_format": parsed["file_format"],
+            "crs": parsed["original_crs"],
+            "data": layer_data,
+        }
+
+    update_investigation_step(inv_id, 2)
+    return {
+        "status": "success",
+        "investigation_id": inv_id,
+        "zip_filename": file.filename or "uploaded_package.zip",
+        "mapped_count": len(mapped_sources),
+        "mapped_sources": mapped_sources,
+        "layers_extracted": [m["source_key"] for m in mapped_sources],
+        "layers": mapped_layers,
+        "ignored_files": ignored_files,
+        "message": f"Successfully unpacked zip and mapped {len(mapped_sources)} data source layers.",
+    }
+
+
+@app.post("/upload/zip-package")
+def upload_zip_package(file: UploadFile = File(...)) -> dict[str, Any]:
+    """
+    Direct ZIP archive upload that auto-creates an investigation and maps all layers.
+    """
+    base_name = Path(file.filename or "uploaded_case").stem.replace("_", " ").title()
+    inv_id = f"inv-{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+    create_investigation(
+        inv_id=inv_id,
+        name=f"Investigation: {base_name}",
+        city_area="Survey Area",
+        cadastral_year="1960",
+        survey_year="2024",
+        description=f"Auto-generated from uploaded package {file.filename}",
+        parcels_count=0
+    )
+    return upload_investigation_zip(inv_id, file)
+
+
 @app.post("/investigations/{inv_id}/validate")
 def validate_investigation_sources(inv_id: str) -> dict[str, Any]:
     """

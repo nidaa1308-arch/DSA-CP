@@ -1,20 +1,11 @@
 ﻿import React from "react";
 import {
-  Home,
-  PlusCircle,
+  LayoutDashboard,
   UploadCloud,
-  CheckSquare,
-  Globe,
-  Sparkles,
-  Layers,
   Map,
-  ShieldAlert,
-  GitFork,
-  ClipboardCheck,
-  FileDown,
+  BarChart3,
   FileText,
   Settings,
-  ExternalLink,
 } from "lucide-react";
 
 export type Screen =
@@ -42,58 +33,101 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentScreen, onSelectScreen }) => {
-  const mainNavItems: { id: Screen; label: string; icon: React.ReactNode }[] = [
-    { id: "dashboard", label: "Dashboard", icon: <Home size={16} /> },
-    { id: "new_investigation", label: "New Investigation", icon: <PlusCircle size={16} /> },
-    { id: "upload", label: "Upload & Ingest", icon: <UploadCloud size={16} /> },
-    { id: "validation", label: "Data Validation", icon: <CheckSquare size={16} /> },
-    { id: "crs_normalization", label: "CRS Normalization", icon: <Globe size={16} /> },
-    { id: "extract", label: "AI Feature Extraction", icon: <Sparkles size={16} /> },
-    { id: "sources", label: "Source Viewer", icon: <Layers size={16} /> },
-    { id: "harmonize", label: "Harmonization", icon: <Map size={16} /> },
-    { id: "conflict_dashboard", label: "Conflict Dashboard", icon: <ShieldAlert size={16} /> },
-    { id: "graph", label: "Evidence Graph", icon: <GitFork size={16} /> },
-    { id: "review", label: "Review & Decision", icon: <ClipboardCheck size={16} /> },
-    { id: "reports", label: "Reports & Export", icon: <FileDown size={16} /> },
-    { id: "audit", label: "Audit Trail", icon: <FileText size={16} /> },
-    { id: "settings", label: "Settings", icon: <Settings size={16} /> },
+  // Simplified 6-item navigation matching the design specification
+  const primaryNavItems: { id: Screen; label: string; icon: React.ReactNode; aliases: Screen[] }[] = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: <LayoutDashboard size={18} />,
+      aliases: ["dashboard"],
+    },
+    {
+      id: "upload",
+      label: "Upload Data",
+      icon: <UploadCloud size={18} />,
+      aliases: ["upload", "new_investigation", "validation", "crs_normalization"],
+    },
+    {
+      id: "discrepancy",
+      label: "View Map",
+      icon: <Map size={18} />,
+      aliases: ["discrepancy", "sources"],
+    },
+    {
+      id: "harmonize",
+      label: "Analysis",
+      icon: <BarChart3 size={18} />,
+      aliases: ["harmonize", "conflict_dashboard", "evidence", "review", "graph", "extract"],
+    },
+    {
+      id: "reports",
+      label: "Reports",
+      icon: <FileText size={18} />,
+      aliases: ["reports", "audit"],
+    },
+    {
+      id: "settings",
+      label: "Settings",
+      icon: <Settings size={18} />,
+      aliases: ["settings"],
+    },
   ];
 
+  const isItemActive = (item: typeof primaryNavItems[0]) => {
+    return item.id === currentScreen || item.aliases.includes(currentScreen);
+  };
+
   return (
-    <aside className="sidebar">
+    <aside className="sidebar-image2">
       {/* Brand Header */}
-      <div className="brand-header" onClick={() => onSelectScreen("landing")} style={{ cursor: "pointer" }}>
-        <div className="gov-seal-mini">🏛️</div>
-        <div className="brand-text">
+      <div className="brand-header-image2" onClick={() => onSelectScreen("landing")}>
+        <div className="gov-seal-image2">🏛️</div>
+        <div className="brand-text-image2">
           <h2>BHUMI-FUSE</h2>
-          <p>Ministry of Panchayati Raj</p>
+          <p>Harmonizing Land Records</p>
         </div>
       </div>
 
-      <nav className="nav-section">
-        <span className="nav-category">Investigation Pipeline</span>
-        {mainNavItems.map((item) => (
-          <button
-            key={item.id}
-            className={`nav-btn ${currentScreen === item.id ? "active" : ""}`}
-            onClick={() => onSelectScreen(item.id)}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </button>
-        ))}
+      {/* Main Navigation */}
+      <nav className="nav-menu-image2">
+        {primaryNavItems.map((item) => {
+          const active = isItemActive(item);
+          return (
+            <button
+              key={item.id}
+              className={`nav-btn-image2 ${active ? "active" : ""}`}
+              onClick={() => onSelectScreen(item.id)}
+            >
+              <span className="nav-icon-image2">{item.icon}</span>
+              <span className="nav-label-image2">{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="sidebar-footer-link" onClick={() => onSelectScreen("landing")}>
-        <ExternalLink size={14} />
-        <span>Portal Landing Page</span>
-      </div>
-
-      <div className="sidebar-user">
-        <div className="user-avatar" style={{ background: "#065f46", color: "#fff" }}>NR</div>
-        <div className="user-info">
-          <b>Nitin R.</b>
-          <span>Land Records Officer</span>
+      {/* Bottom Monument Watermark Artwork & SIH Tag */}
+      <div className="sidebar-footer-image2">
+        <svg
+          className="monument-svg"
+          viewBox="0 0 200 80"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Stylized Indian Heritage Monument Silhouette (India Gate / Fort Arch) */}
+          <path
+            d="M20 75V60H30V75H40V45H50V35H60V25H70V15H80V10H120V15H130V25H140V35H150V45H160V75H170V60H180V75H200V80H0V75H20Z"
+            fill="currentColor"
+            opacity="0.12"
+          />
+          <path
+            d="M85 75V45C85 36.7 91.7 30 100 30C108.3 30 115 36.7 115 45V75H85Z"
+            fill="currentColor"
+            opacity="0.18"
+          />
+          <circle cx="100" cy="20" r="3" fill="currentColor" opacity="0.25" />
+        </svg>
+        <div className="sidebar-footer-text">
+          <span>SIH 2026 • PS-26013</span>
         </div>
       </div>
     </aside>

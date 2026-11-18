@@ -16,8 +16,13 @@ from app.main import (
     validate, TopologyRequest,
     review, ReviewRequest,
     audit_verify, get_db_reviews, get_db_audit,
-    dsa_quadtree_query, dsa_astar_route
+    dsa_quadtree_query, dsa_astar_route,
+    upload_zip_package
 )
+import io
+import json
+import zipfile
+from fastapi import UploadFile
 from app.dsa.astar import astar_search
 from app.dsa.quadtree import QuadTree, Rect
 
@@ -152,3 +157,36 @@ def test_sample_investigation_lifecycle_and_honest_metrics():
     rev_res = review(rev_req)
     assert rev_res["stored"] is True
     assert rev_res.get("version") is not None  # resp.version is defined!
+
+
+def test_zip_package_ingestion():
+    # Build a test zip in memory containing cadastral and footprints
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        cadastral_geojson = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"id": "p1"},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[73.93, 18.55], [73.94, 18.55], [73.94, 18.56], [73.93, 18.56], [73.93, 18.55]]]
+                    }
+                }
+            ]
+        }
+        zf.writestr("test_cadastral_parcels.geojson", json.dumps(cadastral_geojson))
+        zf.writestr("test_drone_footprints.json", json.dumps(cadastral_geojson))
+
+    buf.seek(0)
+    upload_file = UploadFile(filename="test_investigation_bundle.zip", file=buf)
+    res = upload_zip_package(upload_file)
+
+    assert "zip_filename" in res
+    assert res["zip_filename"] == "test_investigation_bundle.zip"
+    assert "cadastral" in res["layers_extracted"]
+    assert "buildings" in res["layers_extracted"]
+    assert "cadastral" in res["layers"]
+    assert res["layers"]["cadastral"]["features_count"] == 1
+

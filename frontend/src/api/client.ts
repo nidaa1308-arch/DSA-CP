@@ -420,6 +420,42 @@ class ApiClient {
     return await res.json();
   }
 
+  async uploadInvestigationZip(invId: string, file: File): Promise<any> {
+    const isOnline = await this.checkBackend();
+    if (!isOnline) {
+      throw new Error("ZIP upload failed: Backend server is offline.");
+    }
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API_BASE}/investigations/${invId}/upload-zip`, {
+      method: "POST",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      throw new Error(`ZIP upload failed (HTTP ${res.status}): ${err}`);
+    }
+    return await res.json();
+  }
+
+  async uploadZipPackage(file: File): Promise<any> {
+    const isOnline = await this.checkBackend();
+    if (!isOnline) {
+      throw new Error("ZIP package upload failed: Backend server is offline.");
+    }
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API_BASE}/upload/zip-package`, {
+      method: "POST",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      throw new Error(`ZIP package upload failed (HTTP ${res.status}): ${err}`);
+    }
+    return await res.json();
+  }
+
   async uploadInvestigationSource(invId: string, sourceKey: string, file: File): Promise<any> {
     const isOnline = await this.checkBackend();
     if (!isOnline) {

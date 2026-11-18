@@ -54,7 +54,7 @@ const makeAuditEntry = (action: string, details: string, type: AuditEntry["type"
 });
 
 export const App: React.FC = () => {
-  const [currentScreen, setCurrentScreen] = useState<Screen>("dashboard");
+  const [currentScreen, setCurrentScreen] = useState<Screen>("landing");
   const [selectedParcelId, setSelectedParcelId] = useState<string>("");
   const [activeAreaId, setActiveAreaId] = useState<string>("pune_kharadi");
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
@@ -257,6 +257,32 @@ export const App: React.FC = () => {
     showToast("Settings applied — live re-computation triggered.");
   };
 
+  const handleLoadSampleInvestigation = () => {
+    const area = STUDY_AREAS["pune_kharadi"];
+    if (!area) return;
+    const sampleLayers = {
+      cadastral: area.cadastral,
+      buildings: area.buildings,
+      control: area.control,
+      municipal: area.municipal,
+    };
+    setCustomLayers(sampleLayers);
+    setUploadedSources([
+      { source: "Cadastral", file: "kharadi_cadastral.geojson", format: "GeoJSON", crs: "EPSG:4326", features: "24", status: "Valid" },
+      { source: "Drone Imagery", file: "kharadi_drone_footprints.geojson", format: "GeoJSON", crs: "EPSG:4326", features: "24", status: "Valid" },
+      { source: "Municipal GIS", file: "kharadi_municipal_roads.geojson", format: "GeoJSON", crs: "EPSG:4326", features: "3", status: "Valid" },
+      { source: "GNSS / CORS", file: "kharadi_gnss_control.geojson", format: "GeoJSON", crs: "EPSG:4326", features: "8", status: "Valid" },
+    ]);
+    addAuditEntry(
+      makeAuditEntry(
+        "Sample Investigation Loaded",
+        "Loaded Pune Kharadi reference pilot dataset (4 layers, 24 parcels) for testing.",
+        "upload"
+      )
+    );
+    showToast("✓ Loaded Pune Kharadi sample investigation dataset.");
+  };
+
   // ── Helpers ────────────────────────────────────────────────────────────
   const addAuditEntry = (entry: AuditEntry) => {
     setAuditLog((prev) => [entry, ...prev]);
@@ -402,16 +428,18 @@ export const App: React.FC = () => {
   const hasActiveSession = Object.keys(customLayers).length > 0;
 
   // Build data bundle for views from live results
-  // When an investigation is active, layers come strictly from uploaded sources, NEVER study area defaults!
+  // Layers come strictly from uploaded sources, NEVER study area defaults!
   const liveData = {
-    name: activeInvestigation?.name || (hasActiveSession ? null : activeArea?.name),
-    cadastral: customLayers.cadastral || (!activeInvestigation && activeArea ? activeArea.cadastral : { type: "FeatureCollection", features: [] }),
-    buildings: customLayers.buildings || (!activeInvestigation && activeArea ? activeArea.buildings : { type: "FeatureCollection", features: [] }),
-    control: customLayers.control || (!activeInvestigation && activeArea ? activeArea.control : { type: "FeatureCollection", features: [] }),
-    municipal: customLayers.municipal || (!activeInvestigation && activeArea ? activeArea.municipal : { type: "FeatureCollection", features: [] }),
+    name: activeInvestigation?.name || (hasActiveSession ? "Active Session" : null),
+    cadastral: customLayers.cadastral || { type: "FeatureCollection", features: [] },
+    buildings: customLayers.buildings || { type: "FeatureCollection", features: [] },
+    control: customLayers.control || { type: "FeatureCollection", features: [] },
+    municipal: customLayers.municipal || { type: "FeatureCollection", features: [] },
+    revenue: customLayers.revenue || null,
+    dsm: customLayers.dsm || null,
     // Override map center/bounds when user uploads data from a different area
-    ...(uploadedBounds ? { bounds: uploadedBounds } : (activeInvestigation ? {} : (activeArea?.bounds ? { bounds: activeArea.bounds } : {}))),
-    ...(uploadedCenter ? { center: uploadedCenter } : (activeInvestigation ? {} : (activeArea?.center ? { center: activeArea.center } : {}))),
+    ...(uploadedBounds ? { bounds: uploadedBounds } : {}),
+    ...(uploadedCenter ? { center: uploadedCenter } : {}),
     residuals: harmonizeResult?.residuals || [],
     harmonized: harmonizeResult?.harmonized || { type: "FeatureCollection", features: [] },
     harmonize_meta: harmonizeResult
@@ -464,6 +492,7 @@ export const App: React.FC = () => {
               data={liveData}
               onSelectParcel={(id) => { setSelectedParcelId(id); setCurrentScreen("review"); }}
               onNavigate={setCurrentScreen}
+              onLoadSample={handleLoadSampleInvestigation}
             />
           )}
           {currentScreen === "new_investigation" && (
