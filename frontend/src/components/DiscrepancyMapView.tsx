@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ShieldCheck, Filter, RotateCcw, ArrowRight, AlertTriangle } from "lucide-react";
+import { ShieldCheck, Filter, RotateCcw, ArrowRight, AlertTriangle, Map, Layers } from "lucide-react";
 import { DemoMap } from "./DemoMap";
 import { Screen } from "./Sidebar";
 
@@ -88,9 +88,29 @@ export const DiscrepancyMapView: React.FC<DiscrepancyMapViewProps> = ({
       <div className="breadcrumb">
         <span>Investigation</span>
         <span>&gt;</span>
-        <span>INV-2026-00124</span>
+        <span>{data?.name || "Active Investigation"}</span>
         <span>&gt;</span>
         <span className="active">Legal vs Physical Discrepancy Map</span>
+      </div>
+
+      {/* Map Module Sub-Navigation */}
+      <div className="inner-module-tabs" style={{ display: "flex", gap: "8px", margin: "14px 0 20px" }}>
+        <button
+          className="btn-emerald"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("discrepancy")}
+        >
+          <Map size={14} />
+          <span>Discrepancy Map</span>
+        </button>
+        <button
+          className="btn-outline"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("sources")}
+        >
+          <Layers size={14} />
+          <span>Multi-Source Viewer (4-Pane)</span>
+        </button>
       </div>
 
       <div className="discrepancy-layout">

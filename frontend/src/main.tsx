@@ -169,6 +169,7 @@ export const App: React.FC = () => {
     cadastral?: any;
     buildings?: any;
     control?: any;
+    gnss?: any;
     municipal?: any;
     utilities?: any;
     dsm?: any;
@@ -468,7 +469,8 @@ export const App: React.FC = () => {
     name: activeInvestigation?.name || (hasActiveSession ? "Active Session" : null),
     cadastral: customLayers.cadastral || { type: "FeatureCollection", features: [] },
     buildings: customLayers.buildings || { type: "FeatureCollection", features: [] },
-    control: customLayers.control || { type: "FeatureCollection", features: [] },
+    control: customLayers.control || customLayers.gnss || { type: "FeatureCollection", features: [] },
+    gnss: customLayers.gnss || customLayers.control || [],
     municipal: customLayers.municipal || { type: "FeatureCollection", features: [] },
     revenue: customLayers.revenue || null,
     dsm: customLayers.dsm || null,
@@ -569,6 +571,7 @@ export const App: React.FC = () => {
             <SourceViewerView
               data={liveData}
               investigation={activeInvestigation}
+              onNavigate={setCurrentScreen}
               onContinue={() => setCurrentScreen("extract")}
             />
           )}
@@ -631,7 +634,9 @@ export const App: React.FC = () => {
             <EvidenceGraphView
               data={liveData}
               graphData={graphData}
+              selectedParcelId={selectedParcelId}
               onSelectParcel={(id) => { setSelectedParcelId(id); }}
+              onNavigate={setCurrentScreen}
               onContinue={() => setCurrentScreen("review")}
             />
           )}

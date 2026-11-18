@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { DemoMap } from "./DemoMap";
-import { Sliders, Eye, ArrowRight } from "lucide-react";
+import { Sliders, Eye, ArrowRight, Map, Layers } from "lucide-react";
 import { Screen } from "./Sidebar";
 
 type AnyObj = Record<string, any>;
@@ -22,16 +22,16 @@ export const SourceViewerView: React.FC<SourceViewerViewProps> = ({ data, invest
   return (
     <div className="page-container">
       {/* Breadcrumb & Header Controls */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
         <div className="breadcrumb">
           <span>Investigation</span>
           <span>&gt;</span>
-          <span>{investigation?.id || data?.id || "INV-2026-00124"}</span>
+          <span>{investigation?.name || investigation?.id || data?.name || "Active Investigation"}</span>
           <span>&gt;</span>
-          <span className="active">Source Viewer</span>
+          <span className="active">Multi-Source Viewer</span>
         </div>
 
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "8px" }}>
           <button
             className={viewMode === "grid" ? "btn-emerald" : "btn-outline"}
             style={{ padding: "6px 14px", fontSize: "12px" }}
@@ -47,6 +47,26 @@ export const SourceViewerView: React.FC<SourceViewerViewProps> = ({ data, invest
             Unified Layered Map
           </button>
         </div>
+      </div>
+
+      {/* Map Module Sub-Navigation */}
+      <div className="inner-module-tabs" style={{ display: "flex", gap: "8px", margin: "14px 0 20px" }}>
+        <button
+          className="btn-outline"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("discrepancy")}
+        >
+          <Map size={14} />
+          <span>Discrepancy Map</span>
+        </button>
+        <button
+          className="btn-emerald"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("sources")}
+        >
+          <Layers size={14} />
+          <span>Multi-Source Viewer (4-Pane)</span>
+        </button>
       </div>
 
       {/* Layer Opacity Bar */}

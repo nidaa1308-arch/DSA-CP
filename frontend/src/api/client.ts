@@ -145,8 +145,8 @@ class ApiClient {
       throw new Error("Evidence graph unavailable: Backend server is offline.");
     }
 
-    // Prefer POST /graph when custom uploaded layers are present so graph is built from real uploads
-    if (customLayers && Object.keys(customLayers).length > 0) {
+    // Prefer POST /graph when custom uploaded layers or investigationId are present
+    if ((customLayers && Object.keys(customLayers).length > 0) || investigationId) {
       const res = await fetch(`${API_BASE}/graph`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -154,12 +154,12 @@ class ApiClient {
           area_id: areaId,
           investigation_id: investigationId ?? null,
           custom_layers: customLayers ?? null,
+          residuals: residuals ?? [],
         }),
       });
-      if (!res.ok) {
-        throw new Error(`Evidence graph failed with status ${res.status}`);
+      if (res.ok) {
+        return await res.json();
       }
-      return await res.json();
     }
 
     const query = investigationId ? `investigation_id=${investigationId}` : `area_id=${areaId}`;

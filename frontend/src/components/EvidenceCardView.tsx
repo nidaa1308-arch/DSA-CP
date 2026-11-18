@@ -25,7 +25,8 @@ export const EvidenceCardView: React.FC<EvidenceCardViewProps> = ({
 
   const residual =
     selectedCase ||
-    (data.residuals || []).find((r: AnyObj) => r.parcel_id === selectedParcelId || String(r.parcel_num) === selectedParcelId);
+    (data.residuals || []).find((r: AnyObj) => r.parcel_id === selectedParcelId || String(r.parcel_num) === String(selectedParcelId)) ||
+    (data.residuals && data.residuals.length > 0 ? data.residuals[0] : null);
 
   if (!residual) {
     return (
@@ -68,9 +69,45 @@ export const EvidenceCardView: React.FC<EvidenceCardViewProps> = ({
       <div className="breadcrumb">
         <span>Investigation</span>
         <span>&gt;</span>
-        <span>INV-2026-00124</span>
+        <span>{data.name || "Active Investigation"}</span>
         <span>&gt;</span>
         <span className="active">Evidence Card & Recommendation</span>
+      </div>
+
+      {/* Inner Module Sub-Navigation */}
+      <div className="inner-module-tabs" style={{ display: "flex", gap: "8px", margin: "14px 0 20px" }}>
+        <button
+          className="btn-outline"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("conflict_dashboard")}
+        >
+          <AlertTriangle size={14} />
+          <span>Conflict Dashboard</span>
+        </button>
+        <button
+          className="btn-emerald"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("evidence")}
+        >
+          <FileSpreadsheet size={14} />
+          <span>Spatial Evidence Card</span>
+        </button>
+        <button
+          className="btn-outline"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("graph")}
+        >
+          <Layers size={14} />
+          <span>Spatial Evidence Graph</span>
+        </button>
+        <button
+          className="btn-outline"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("review")}
+        >
+          <CheckCircle2 size={14} />
+          <span>Review & Decision</span>
+        </button>
       </div>
 
       {/* Ambiguous Match Alert if applicable */}

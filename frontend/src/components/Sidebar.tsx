@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Network,
   CheckSquare,
+  FileCheck2,
 } from "lucide-react";
 
 export type Screen =
@@ -58,22 +59,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentScreen, onSelectScreen 
       aliases: ["sources"],
     },
     {
-      id: "conflict_dashboard",
-      label: "Conflict Dashboard",
-      icon: <AlertTriangle size={18} />,
-      aliases: ["conflict_dashboard"],
-    },
-    {
       id: "discrepancy",
       label: "Discrepancy Map",
       icon: <Map size={18} />,
       aliases: ["discrepancy"],
     },
     {
+      id: "conflict_dashboard",
+      label: "Conflict Dashboard",
+      icon: <AlertTriangle size={18} />,
+      aliases: ["conflict_dashboard"],
+    },
+    {
+      id: "evidence",
+      label: "Spatial Evidence Card",
+      icon: <FileCheck2 size={18} />,
+      aliases: ["evidence"],
+    },
+    {
       id: "graph",
-      label: "Evidence Graph",
+      label: "Spatial Evidence Graph",
       icon: <Network size={18} />,
-      aliases: ["graph", "evidence"],
+      aliases: ["graph"],
     },
     {
       id: "review",
@@ -83,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentScreen, onSelectScreen 
     },
     {
       id: "reports",
-      label: "Reports & Audit",
+      label: "Reports & Export",
       icon: <FileText size={18} />,
       aliases: ["reports", "audit"],
     },

@@ -2072,8 +2072,44 @@ def dsa_summary() -> dict[str, Any]:
 
 
 @app.get("/graph")
-def graph(area_id: str = Query("pune_kharadi")) -> dict[str, Any]:
+def graph(area_id: str = Query("pune_kharadi"), investigation_id: str | None = Query(None)) -> dict[str, Any]:
     """Spatial Evidence Graph with spatially-computed edges."""
+    if investigation_id:
+        sources = get_investigation_sources(investigation_id)
+        cad, drone, muni, gnss = [], [], [], []
+        if "cadastral" in sources:
+            try:
+                c_raw = json.loads(sources["cadastral"]["data_json"])
+                cad = c_raw.get("features", []) if isinstance(c_raw, dict) else (c_raw if isinstance(c_raw, list) else [])
+            except Exception:
+                pass
+        if "buildings" in sources:
+            try:
+                b_raw = json.loads(sources["buildings"]["data_json"])
+                drone = b_raw.get("features", []) if isinstance(b_raw, dict) else (b_raw if isinstance(b_raw, list) else [])
+            except Exception:
+                pass
+        if "municipal" in sources:
+            try:
+                m_raw = json.loads(sources["municipal"]["data_json"])
+                muni = m_raw.get("features", []) if isinstance(m_raw, dict) else (m_raw if isinstance(m_raw, list) else [])
+            except Exception:
+                pass
+        if "gnss" in sources:
+            try:
+                g_raw = json.loads(sources["gnss"]["data_json"])
+                gnss = g_raw.get("features", []) if isinstance(g_raw, dict) else (g_raw if isinstance(g_raw, list) else [])
+            except Exception:
+                pass
+        from app.services.evidence_graph import EvidenceGraphService
+        return EvidenceGraphService.build_graph(
+            cad_features=cad,
+            drone_features=drone,
+            gnss_points=gnss if isinstance(gnss, list) else [],
+            municipal_features=muni,
+            residuals=[],
+        )
+
     area = STUDY_AREAS.get(area_id, STUDY_AREAS["pune_kharadi"])
     nodes = []
     links = []
@@ -2162,19 +2198,59 @@ async def post_graph(request: Request) -> dict[str, Any]:
     Constructs Spatial Evidence Graph dynamically from caller-supplied layers/investigation.
     """
     payload = await request.json()
-    cad = payload.get("cadastral", {}).get("features", []) if isinstance(payload.get("cadastral"), dict) else []
-    drone = payload.get("buildings", {}).get("features", []) if isinstance(payload.get("buildings"), dict) else []
-    gnss = payload.get("gnss", [])
-    muni = payload.get("municipal", {}).get("features", []) if isinstance(payload.get("municipal"), dict) else []
+    inv_id = payload.get("investigation_id")
+    custom = payload.get("custom_layers") or payload
+    if not isinstance(custom, dict):
+        custom = {}
+
+    cad_in = custom.get("cadastral")
+    cad = cad_in.get("features", []) if isinstance(cad_in, dict) else (cad_in if isinstance(cad_in, list) else [])
+
+    drone_in = custom.get("buildings") or custom.get("drone")
+    drone = drone_in.get("features", []) if isinstance(drone_in, dict) else (drone_in if isinstance(drone_in, list) else [])
+
+    muni_in = custom.get("municipal")
+    muni = muni_in.get("features", []) if isinstance(muni_in, dict) else (muni_in if isinstance(muni_in, list) else [])
+
+    gnss_in = custom.get("gnss") or custom.get("control")
+    gnss = gnss_in.get("features", []) if isinstance(gnss_in, dict) else (gnss_in if isinstance(gnss_in, list) else [])
+
     residuals = payload.get("residuals", [])
+
+    if inv_id and (not cad or not drone):
+        sources = get_investigation_sources(inv_id)
+        if not cad and "cadastral" in sources:
+            try:
+                c_raw = json.loads(sources["cadastral"]["data_json"])
+                cad = c_raw.get("features", []) if isinstance(c_raw, dict) else (c_raw if isinstance(c_raw, list) else [])
+            except Exception:
+                pass
+        if not drone and "buildings" in sources:
+            try:
+                b_raw = json.loads(sources["buildings"]["data_json"])
+                drone = b_raw.get("features", []) if isinstance(b_raw, dict) else (b_raw if isinstance(b_raw, list) else [])
+            except Exception:
+                pass
+        if not muni and "municipal" in sources:
+            try:
+                m_raw = json.loads(sources["municipal"]["data_json"])
+                muni = m_raw.get("features", []) if isinstance(m_raw, dict) else (m_raw if isinstance(m_raw, list) else [])
+            except Exception:
+                pass
+        if not gnss and "gnss" in sources:
+            try:
+                g_raw = json.loads(sources["gnss"]["data_json"])
+                gnss = g_raw.get("features", []) if isinstance(g_raw, dict) else (g_raw if isinstance(g_raw, list) else [])
+            except Exception:
+                pass
 
     from app.services.evidence_graph import EvidenceGraphService
     return EvidenceGraphService.build_graph(
         cad_features=cad,
         drone_features=drone,
-        gnss_points=gnss,
+        gnss_points=gnss if isinstance(gnss, list) else [],
         municipal_features=muni,
-        residuals=residuals,
+        residuals=residuals if isinstance(residuals, list) else [],
     )
 
 

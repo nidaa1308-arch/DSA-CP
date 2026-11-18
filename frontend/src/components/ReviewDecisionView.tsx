@@ -10,6 +10,8 @@ import {
   ShieldAlert,
   Clock,
   Info,
+  FileSpreadsheet,
+  Layers,
 } from "lucide-react";
 import { DemoMap } from "./DemoMap";
 import { Screen } from "./Sidebar";
@@ -106,6 +108,42 @@ export const ReviewDecisionView: React.FC<ReviewDecisionViewProps> = ({
             <ChevronRight size={14} />
           </button>
         </div>
+      </div>
+
+      {/* Inner Module Sub-Navigation */}
+      <div className="inner-module-tabs" style={{ display: "flex", gap: "8px", margin: "14px 0 20px" }}>
+        <button
+          className="btn-outline"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("conflict_dashboard")}
+        >
+          <AlertTriangle size={14} />
+          <span>Conflict Dashboard</span>
+        </button>
+        <button
+          className="btn-outline"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("evidence")}
+        >
+          <FileSpreadsheet size={14} />
+          <span>Spatial Evidence Card</span>
+        </button>
+        <button
+          className="btn-outline"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("graph")}
+        >
+          <Layers size={14} />
+          <span>Spatial Evidence Graph</span>
+        </button>
+        <button
+          className="btn-emerald"
+          style={{ padding: "6px 14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+          onClick={() => onNavigate?.("review")}
+        >
+          <CheckCircle2 size={14} />
+          <span>Review & Decision</span>
+        </button>
       </div>
 
       {/* 3-Column Split */}
